@@ -74,6 +74,9 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-aptrow select{font:inherit;font-size:var(--cds-font-size-caption);color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem;max-width:100%}
 .gx-aptrow .rm{font:inherit;border:0;background:transparent;color:var(--color-fg-muted);cursor:pointer;padding:.2rem .4rem;border-radius:6px}
 .gx-aptrow .rm:hover{color:var(--color-bad)}
+.gx-head h1.gx-title{font-size:2rem;font-weight:700;color:var(--c0)}
+#tabs button{font-size:var(--cds-font-size-body);font-weight:700;color:var(--c0);padding:.4rem .95rem}
+#tabs button[aria-pressed="true"]{color:var(--c0);border-color:var(--c0);background:var(--color-bg);font-weight:700}
 .gx-note.err{color:var(--color-bad)}
 #gs-tbl th{cursor:pointer;user-select:none}
 .gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
@@ -82,7 +85,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 <body><div class="wrap">
 <div class="gx-page">
 
-  <header class="gx-head"><h1>아파트 실거래가 및 공시가격 조회</h1></header>
+  <header class="gx-head"><h1 class="gx-title">아파트 실거래가 및 공시가격 조회</h1></header>
 
   <section class="gx-card gx-ctrl" aria-label="조회 조건">
     <div class="gx-row">
