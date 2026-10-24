@@ -66,6 +66,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-xl{font:inherit;font-size:var(--cds-font-size-caption);margin-top:.6rem;padding:.4rem .9rem;border:1px solid var(--cds-border);border-radius:8px;background:var(--color-bg);color:var(--color-fg);cursor:pointer}
 .gx-xl:hover{border-color:var(--color-fg)}
 @media print{.gx-xl{display:none}}
+.gx-aptrows{display:flex;flex-direction:column;gap:.5rem}
+.gx-aptrow{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .8rem;padding:.45rem .7rem;border:1px solid var(--color-border-line);border-radius:8px;background:var(--color-bg)}
+.gx-aptrow i{width:.7rem;height:.7rem;border-radius:50%;flex:none}
+.gx-aptrow .nm{flex:1 1 14rem;min-width:0}
+.gx-aptrow .nm small{color:var(--color-fg-muted);margin-left:.4rem;font-size:var(--cds-font-size-caption)}
+.gx-aptrow select{font:inherit;font-size:var(--cds-font-size-caption);color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem;max-width:100%}
+.gx-aptrow .rm{font:inherit;border:0;background:transparent;color:var(--color-fg-muted);cursor:pointer;padding:.2rem .4rem;border-radius:6px}
+.gx-aptrow .rm:hover{color:var(--color-bad)}
 .gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
 .gx-empty{color:var(--color-fg-muted);padding:2rem 0;text-align:center}
 </style></head>
@@ -98,11 +106,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <button type="button" class="gx-xl" id="xl-cmp">엑셀로 내보내기 (.xlsx)</button></header>
       <div class="gx-card gx-empty" id="c-empty">단지 상세 화면에서 <b>＋ 비교에 추가</b>를 눌러 단지를 담아 주세요.<br>시군구를 바꿔 다시 조회한 단지도 이어서 담을 수 있습니다. (최대 8개)</div>
       <div class="gx-page" id="c-body">
-        <section class="gx-card"><h2>비교 단지</h2><div class="gx-chips" id="c-apts"></div></section>
+        <section class="gx-card"><h2>비교 단지</h2><p class="gx-note">단지마다 비교할 평형을 따로 고를 수 있습니다. ✕를 누르면 비교에서 뺍니다.</p><div class="gx-aptrows" id="c-apts"></div></section>
         <div class="gx-pickbar">
-          <span class="gx-lab">평형 선택</span>
-          <div class="gx-chips" id="c-sizes" role="group" aria-label="평형 선택"></div>
-          <label class="gx-hint gx-inline" style="display:inline-flex">지표
+          <span class="gx-lab">지표</span>
+          <label class="gx-hint gx-inline" style="display:inline-flex">
             <select id="c-metric" style="font:inherit;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem">
               <option value="price">거래가(만원)</option><option value="ppy">전용 평당가(만원)</option>
             </select></label>
@@ -123,7 +130,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           <p class="gx-note" id="c-note-table"></p>
           <div class="gx-tablewrap">
             <table class="gx-table" id="c-tbl">
-              <thead><tr><th>단지</th><th>지역</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th><th>최근 6개월 평균</th><th>최근 거래</th></tr></thead>
+              <thead><tr><th>단지</th><th>지역</th><th>평형</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th><th>최근 6개월 평균</th><th>최근 거래</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -562,7 +569,6 @@ function render() {
 }
 
 /* ---------- 단지 비교 ---------- */
-state.cmpPick = null;
 state.cmpMetric = 'price';
 
 function applyView() {
@@ -574,6 +580,13 @@ function applyView() {
 }
 [...$('tabs').children].forEach((b) => b.addEventListener('click', () => { state.view = b.dataset.view; applyView(); }));
 
+// 단지별 평형 기본값: 이미 담긴 단지들이 고른 평형을 이 단지도 갖고 있으면 그것, 없으면 이 단지에서 가장 많이 거래된 평형
+const defaultPick = (e, others) => {
+  const common = others.map((o) => o.pick).find((p) => p && p !== ALL && e.sizes.some((s) => s.label === p));
+  if (common) return common;
+  return d3.rollups(e.trades, (v) => v.length, (t) => t.size).sort((a, b) => b[1] - a[1])[0][0];
+};
+
 $('addCmp').onclick = () => {
   const st = $('status');
   if (!state.trades.length) return;
@@ -583,7 +596,9 @@ $('addCmp').onclick = () => {
   st.className = '';
   if (state.cmp.some((e) => e.id === id)) { st.textContent = '이미 비교 목록에 있습니다.'; return; }
   if (state.cmp.length >= 8) { st.className = 'err'; st.textContent = '비교는 최대 8개 단지까지 가능합니다.'; return; }
-  state.cmp.push({ id, lawd: sel.value, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes });
+  const entry = { id, lawd: sel.value, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes };
+  entry.pick = defaultPick(entry, state.cmp);
+  state.cmp.push(entry);
   saveCmp();
   st.textContent = `비교 목록에 추가했습니다 (${state.cmp.length}개)`;
   applyView();
@@ -593,7 +608,7 @@ $('addCmp').onclick = () => {
 const CMP_KEY = 'aptCompareList.v1';
 function saveCmp() {
   try {
-    localStorage.setItem(CMP_KEY, JSON.stringify(state.cmp.map(({ id, lawd, key, apt, dong, regionName, from, to }) => ({ id, lawd, key, apt, dong, regionName, from, to }))));
+    localStorage.setItem(CMP_KEY, JSON.stringify(state.cmp.map(({ id, lawd, key, apt, dong, regionName, from, to, pick }) => ({ id, lawd, key, apt, dong, regionName, from, to, pick }))));
   } catch {}
 }
 async function restoreCmp() {
@@ -615,7 +630,10 @@ async function restoreCmp() {
       }
       const trades = prepTrades(cache.get(ck), m.key);
       if (!trades.length) throw new Error('거래 없음');
-      state.cmp.push({ ...m, trades, sizes: buildSizes(trades) });
+      const entry = { ...m, trades, sizes: buildSizes(trades) };
+      // 저장된 평형이 없거나 데이터 갱신으로 사라졌으면 기본값
+      if (entry.pick !== ALL && !entry.sizes.some((s) => s.label === entry.pick)) entry.pick = defaultPick(entry, state.cmp);
+      state.cmp.push(entry);
     } catch { failed.push(m.apt); }
   }
   saveCmp();
@@ -640,40 +658,37 @@ function renderCompare() {
   const avgV = (rows) => (rows.length ? d3.mean(rows, val) : null);
   const mname = metric === 'price' ? '거래가' : '전용 평당가';
 
-  // 평형: 담긴 단지들의 평형 합집합 (기본은 가장 많은 단지에 있는 평형)
-  const sizeCount = new Map(), sizePy = new Map();
-  for (const e of E) for (const s of e.sizes) { sizeCount.set(s.label, (sizeCount.get(s.label) || 0) + 1); sizePy.set(s.label, s.py); }
-  const labels = [...sizeCount.keys()].sort((a, b) => parseInt(a) - parseInt(b));
-  if (state.cmpPick !== ALL && !sizeCount.has(state.cmpPick)) {
-    state.cmpPick = [...sizeCount].sort((a, b) => b[1] - a[1] || parseInt(a[0]) - parseInt(b[0]))[0][0];
-  }
-  const pick = state.cmpPick;
-  const where = pick === ALL ? '전체 평형' : '전용 ' + pick;
-  const rowsOf = (e) => (pick === ALL ? e.trades : e.trades.filter((t) => t.size === pick));
+  // 단지별로 고른 평형이 유효한지 확인 (없으면 기본값)
+  for (const e of E) if (e.pick !== ALL && !e.sizes.some((s) => s.label === e.pick)) e.pick = defaultPick(e, E.filter((o) => o !== e));
+  const rowsOf = (e) => (e.pick === ALL ? e.trades : e.trades.filter((t) => t.size === e.pick));
   const name = (e) => `${e.apt} (${e.dong})`;
+  const pickName = (e) => (e.pick === ALL ? '전체' : e.pick);
+  const label = (e) => `${name(e)} · ${pickName(e)}`;
+  const picks = new Set(E.map((e) => e.pick));
+  const where = picks.size === 1 ? (E[0].pick === ALL ? '전체 평형' : '전용 ' + E[0].pick) : '단지별 평형';
 
   $('c-sub').textContent = `${E.length}개 단지 · ${where} · ${mname} 기준 · 단위 만원 · 해제(취소) 거래 제외`;
 
-  // 단지 칩 (클릭하면 제거)
+  // 단지별 행: 평형 드롭다운 + 제거
   const ca = $('c-apts'); ca.replaceChildren();
   E.forEach((e, i) => {
-    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', 'true'); b.title = '클릭하면 비교에서 제거';
-    const d = document.createElement('i'); d.style.background = col(i);
-    b.append(d, document.createTextNode(`${name(e)} · ${e.regionName} ✕`));
-    b.addEventListener('click', () => { state.cmp.splice(i, 1); saveCmp(); applyView(); });
-    ca.append(b);
+    const row = document.createElement('div'); row.className = 'gx-aptrow';
+    const dot = document.createElement('i'); dot.style.background = col(i);
+    const nm = document.createElement('div'); nm.className = 'nm';
+    nm.append(document.createTextNode(name(e)));
+    const sm = document.createElement('small'); sm.textContent = e.regionName; nm.append(sm);
+    const cnt = d3.rollup(e.trades, (v) => v.length, (t) => t.size);
+    const s = document.createElement('select'); s.setAttribute('aria-label', name(e) + ' 평형');
+    s.append(new Option(`전체 평형 · ${e.trades.length}건`, ALL));
+    for (const z of e.sizes) s.append(new Option(`${z.label} (약 ${z.py}평) · ${cnt.get(z.label) || 0}건`, z.label));
+    s.value = e.pick;
+    s.addEventListener('change', () => { e.pick = s.value; saveCmp(); renderCompare(); });
+    const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm'; rm.title = '비교에서 제거'; rm.textContent = '✕';
+    rm.addEventListener('click', () => { state.cmp.splice(i, 1); saveCmp(); applyView(); });
+    row.append(dot, nm, s, rm);
+    ca.append(row);
   });
 
-  // 평형 칩
-  const cs = $('c-sizes'); cs.replaceChildren();
-  [ALL, ...labels].forEach((s) => {
-    const b = document.createElement('button'); b.type = 'button';
-    const have = s === ALL ? E.length : sizeCount.get(s);
-    b.append(document.createTextNode(s === ALL ? '전체' : `${s} (약 ${sizePy.get(s)}평) · ${have}/${E.length}단지`));
-    b.setAttribute('aria-pressed', String(s === pick));
-    b.addEventListener('click', () => { state.cmpPick = s; renderCompare(); });
-    cs.append(b);
-  });
   $('c-metric').value = metric;
 
   // 월별 평균 선
@@ -682,7 +697,7 @@ function renderCompare() {
   const parse = (s) => new Date(s + '-01T00:00:00Z');
   const series = E.map((e, i) => {
     const byM = d3.group(rowsOf(e), (t) => t.ym);
-    return { name: name(e), color: col(i),
+    return { name: label(e), color: col(i),
       pts: months.filter((m) => byM.has(m)).map((m) => ({ x: parse(m), y: avgV(byM.get(m)), n: byM.get(m).length, ym: m })) };
   });
   legend($('c-legend'), series.map((s) => ({ name: s.name, color: s.color })));
@@ -701,7 +716,7 @@ function renderCompare() {
   const e2 = $('c-bars'); e2.replaceChildren();
   const years = [...new Set(months.map((m) => +m.slice(0, 4)))];
   const bars = [];
-  E.forEach((e, i) => { for (const [yr, v] of d3.group(rowsOf(e), (t) => t.year)) bars.push({ i, name: name(e), year: yr, avg: avgV(v), n: v.length }); });
+  E.forEach((e, i) => { for (const [yr, v] of d3.group(rowsOf(e), (t) => t.year)) bars.push({ i, name: label(e), year: yr, avg: avgV(v), n: v.length }); });
   if (!bars.length) { e2.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; }
   else {
     const W = Math.max(e2.clientWidth, 280), H = 240, m = { t: 20, r: 8, b: 28, l: 46 };
@@ -726,7 +741,7 @@ function renderCompare() {
     const r = rowsOf(e), v = r.map(val), recent = r.filter((t) => t.ym >= cut);
     const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
     const tr = document.createElement('tr');
-    [name(e), e.regionName, fmt(r.length), r.length ? fmt(Math.round(d3.mean(v))) : '—', r.length ? fmt(Math.round(d3.min(v))) : '—',
+    [name(e), e.regionName, pickName(e), fmt(r.length), r.length ? fmt(Math.round(d3.mean(v))) : '—', r.length ? fmt(Math.round(d3.min(v))) : '—',
       r.length ? fmt(Math.round(d3.max(v))) : '—', recent.length ? fmt(Math.round(d3.mean(recent, val))) : '—',
       last ? `${last.date} · ${fmt(last.price)}` : '—']
       .forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
@@ -778,11 +793,12 @@ function buildDetailWb() {
 }
 
 function buildCompareWb() {
-  const E = state.cmp, pick = state.cmpPick, metric = state.cmpMetric;
+  const E = state.cmp, metric = state.cmpMetric;
   const val = (t) => (metric === 'price' ? t.price : ppy(t));
   const mname = metric === 'price' ? '거래가(만원)' : '전용 평당가(만원)';
-  const rowsOf = (e) => (pick === ALL ? e.trades : e.trades.filter((t) => t.size === pick));
+  const rowsOf = (e) => (e.pick === ALL ? e.trades : e.trades.filter((t) => t.size === e.pick));
   const name = (e) => `${e.apt} (${e.dong})`;
+  const colName = (e) => `${name(e)} · ${e.pick === ALL ? '전체' : e.pick}`;
   const from = E.map((e) => e.from).sort()[0], to = E.map((e) => e.to).sort().at(-1);
   const months = monthsInRange(from, to);
   const cut = months.length > 6 ? months[months.length - 6] : months[0];
@@ -792,7 +808,7 @@ function buildCompareWb() {
     const r = rowsOf(e), v = r.map(val), recent = r.filter((t) => t.ym >= cut);
     const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
     return {
-      '단지': name(e), '지역': e.regionName, '평형': pick === ALL ? '전체' : pick, '지표': mname, '건수': r.length,
+      '단지': name(e), '지역': e.regionName, '평형': e.pick === ALL ? '전체' : e.pick, '지표': mname, '건수': r.length,
       '평균': r.length ? Math.round(d3.mean(v)) : undefined, '최저': r.length ? Math.round(d3.min(v)) : undefined,
       '최고': r.length ? Math.round(d3.max(v)) : undefined,
       '최근 6개월 평균': recent.length ? Math.round(d3.mean(recent, val)) : undefined,
@@ -802,7 +818,7 @@ function buildCompareWb() {
 
   XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
     const row = { '계약월': m };
-    for (const e of E) { const v = rowsOf(e).filter((t) => t.ym === m); row[name(e)] = v.length ? Math.round(d3.mean(v, val)) : undefined; }
+    for (const e of E) { const v = rowsOf(e).filter((t) => t.ym === m); row[colName(e)] = v.length ? Math.round(d3.mean(v, val)) : undefined; }
     return row;
   }), [10, ...E.map(() => 24)]), `월별 평균 ${metric === 'price' ? '거래가' : '평당가'}`);
 
