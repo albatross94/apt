@@ -37,14 +37,36 @@
 
 3. 시군구와 기간을 고르고 **조회**를 누릅니다. 조회가 끝나면 아파트명 드롭다운이 켜집니다.
 
+## Vercel에 배포
+
+`public/`(화면)과 `api/`(서버리스 함수)를 그대로 배포할 수 있습니다. 로컬의 `server.js`는 Vercel에서는 쓰이지 않습니다.
+
+1. 이 저장소를 GitHub에 올린 뒤 [vercel.com/new](https://vercel.com/new)에서 **Import** 합니다. 빌드 설정은 `vercel.json`에 들어 있어 그대로 두면 됩니다. (Framework Preset: Other)
+2. 배포 전에 프로젝트의 **Settings → Environment Variables**에 인증키를 추가합니다. 이름은 `.env`와 같습니다.
+
+   | 이름 | 값 | 용도 |
+   |---|---|---|
+   | `SERVICE_KEY` | 공공데이터포털 인증키 | 실거래가 |
+   | `VWORLD_KEY` | V-World 인증키 | 동·호별 공시가격 (선택) |
+
+3. **Deploy** 합니다. 키를 나중에 바꾸면 환경 변수를 수정한 뒤 다시 배포해야 적용됩니다.
+
+CLI로 하려면 `npm i -g vercel` 후 `vercel`(미리보기) / `vercel --prod`(운영)을 실행하고, 키는 `vercel env add SERVICE_KEY`처럼 추가합니다.
+
+**알아두실 점**
+- **공개 주소로 배포하면 누구나 내 인증키의 호출 한도를 쓰게 됩니다.** 완화책으로 성공 응답에 캐시 헤더를 붙여 Vercel CDN이 같은 요청을 대신 응답합니다(지난 달 실거래가 30일, 올해 공시가격 1일 등). 그래도 혼자 쓰려면 Vercel의 **Deployment Protection**(Vercel Authentication, 비밀번호)으로 접근을 막아 두세요.
+- Vercel에는 영구 디스크가 없어서 `cache/`는 쓰지 않고, 함수 인스턴스의 임시 폴더(`/tmp`)만 보조로 씁니다. 캐시의 핵심은 CDN입니다.
+- 실거래가는 한 번에 한 달씩 요청하고(화면이 4개씩 동시에 보냄) 함수 실행 시간 제한을 넉넉히 잡아 두었습니다(`maxDuration: 60`). 요금제에 따라 허용되는 최대 시간이 다르니, 한도에 걸리면 Vercel 대시보드에서 확인하세요.
+- 공시가격에서 V-World 인증 오류가 나면 V-World 마이포털의 인증키에 등록된 **서비스 URL**에 배포 주소를 추가해 보세요.
+
 ## 동작 방식
 
-인증키가 브라우저로 노출되지 않도록, 그리고 받은 결과를 캐시해 호출 횟수를 줄이도록 `server.js`가 외부 API를 대신 호출합니다.
+인증키가 브라우저로 노출되지 않도록, 그리고 받은 결과를 캐시해 호출 횟수를 줄이도록 서버 쪽에서 외부 API를 대신 호출합니다. 처리 로직은 `lib/core.js` 한 곳에 있고, 로컬 서버(`server.js`)와 Vercel 함수(`api/*.js`)가 같이 씁니다.
 
 ```
-브라우저 ──/api/trades──▶ server.js ──▶ apis.data.go.kr (RTMSDataSvcAptTrade)
-   ▲     ──/api/gongsi/*─▶     │    └──▶ api.vworld.kr   (주소 검색, 공동주택가격)
-   └── public/index.html ◀─────┘  결과를 cache/ 에 저장
+브라우저 ──/api/trades──▶ lib/core.js ──▶ apis.data.go.kr (RTMSDataSvcAptTrade)
+   ▲     ──/api/gongsi/*─▶     │      └──▶ api.vworld.kr   (주소 검색, 공동주택가격)
+   └── public/index.html ◀─────┘  결과 캐시: 로컬은 cache/, Vercel은 CDN
 ```
 
 - 호출하는 API는 `RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`(기본 API)입니다.
@@ -65,8 +87,13 @@
 ## 폴더 구성
 
 ```
-server.js            API 프록시 + 정적 파일 서버
+server.js            로컬 실행용 서버 (API 라우팅 + 정적 파일)
 start.bat            Windows용 실행 파일
+lib/core.js          데이터 처리 공통 로직 (실거래가·공시가격 호출, 캐시, 라우팅)
+api/                 Vercel 서버리스 함수 (lib/core.js를 호출)
+vercel.json          Vercel 배포 설정
+package.json         Node 버전 지정, npm start
+.vercelignore        Vercel 배포에서 제외할 파일
 public/index.html    화면 (실거래가·실거래가 단지 비교·동·호별 공시가격·엑셀 내보내기)
 public/regions.json  전국 시군구 코드 목록
 cache/               조회 결과 캐시 (자동 생성, git 제외)
