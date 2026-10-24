@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>아파트 실거래가</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
+--cds-font-size-title:1.75rem;--cds-font-size-heading:1.0625rem;--cds-font-size-body:.9375rem;--cds-font-size-caption:.8125rem;--cds-font-weight-medium:600;
+--cds-gap-xs:.35rem;--cds-gap-sm:.6rem;--cds-gap-md:1rem;--cds-gap-lg:1.5rem;--cds-pad-xs:.3rem;--cds-pad-sm:.6rem;--cds-pad-lg:1.1rem;--cds-radius:10px;
+--cds-chart-grid:#e6e9ef;--cds-chart-muted:#b7bdc9;--cds-chart-axis:#aab1bf;--cds-surface-popover:#ffffff;--cds-border:#c9cfda;--cds-shadow-popover:0 4px 14px rgba(20,30,50,.15);--cds-text-secondary:#5f6878;
+--font-sans:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR","Segoe UI",system-ui,sans-serif;
+--c0:#2a5bd7;--c1:#d9531e;--c2:#1c8c6e;--c3:#8a4fd1;--c4:#c29a0d;--c5:#0e8aa8;--c6:#c2417a;--c7:#6b7280;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--color-bg:#14171d;--color-fg:#e8ebf1;--color-fg-muted:#9aa3b2;--color-panel:#1c2028;--color-border-line:#2c323d;--color-bad:#ef6b5c;
+--cds-chart-grid:#2a303a;--cds-chart-muted:#4d5666;--cds-chart-axis:#566072;--cds-surface-popover:#262b35;--cds-border:#3a4150;--cds-shadow-popover:0 4px 14px rgba(0,0,0,.5);--cds-text-secondary:#9aa3b2;
+--c0:#6f9bff;--c1:#ff8a57;--c2:#4fc9a4;--c3:#b793f2;--c4:#e6c24a;--c5:#4cc3dd;--c6:#f07aa8;--c7:#9aa3b2;color-scheme:dark}}
+[hidden]{display:none!important}
+html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-family:var(--font-sans);font-size:var(--cds-font-size-body);line-height:1.5}
+.wrap{padding:max(16px,3vw)}
+@media print{.gx-tablewrap{max-height:none;overflow:visible}.gx-card,.gx-tile{break-inside:avoid}.gx-ctrl{display:none}}
+.gx-page{max-width:1100px;margin-inline:auto;display:flex;flex-direction:column;gap:var(--cds-gap-lg);font-variant-numeric:tabular-nums}
+.gx-head h1{font-weight:400;font-size:var(--cds-font-size-title);margin:0;text-wrap:balance}
+.gx-head p{margin:var(--cds-gap-xs) 0 0;color:var(--color-fg-muted)}
+.gx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:var(--cds-gap-md)}
+.gx-tile{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);display:flex;flex-direction:column;gap:var(--cds-gap-xs);min-width:0;cursor:pointer}
+.gx-tile .gx-k{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.gx-tile .gx-v{font-size:var(--cds-font-size-title);line-height:1.1}
+.gx-tile .gx-v small{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin-left:.25em}
+.gx-tile .gx-d{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.gx-tile.gx-on{border-color:var(--color-fg)}
+.gx-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:var(--cds-gap-md)}
+.gx-card{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);display:flex;flex-direction:column;gap:var(--cds-gap-sm);min-width:0}
+.gx-card h2{margin:0;font-size:var(--cds-font-size-heading);font-weight:var(--cds-font-weight-medium)}
+.gx-note{margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.gx-ctrl{display:flex;flex-direction:column;gap:.8rem}
+.gx-row{display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end}
+.gx-ctrl label{display:flex;flex-direction:column;gap:.25rem;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.gx-ctrl select{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:9rem}
+.gx-ctrl select:disabled{opacity:.55}
+.gx-ctrl button{font:inherit;padding:.45rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
+.gx-ctrl button:disabled{opacity:.5;cursor:wait}
+.gx-ctrl button.sec{background:transparent;color:var(--color-fg)}
+.gx-ctrl .gx-inline{flex-direction:row;align-items:center;gap:.5rem}
+#status{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+#status.err{color:var(--color-bad)}
+.gx-pickbar{position:sticky;top:0;z-index:3;background:var(--color-bg);padding-block:.6rem;border-bottom:1px solid var(--color-border-line);display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem}
+.gx-pickbar .gx-lab{font-weight:var(--cds-font-weight-medium)}
+.gx-pickbar .gx-hint{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.gx-chips{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs)}
+.gx-chips button{font:inherit;font-size:var(--cds-font-size-caption);display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;border:1px solid var(--color-border-line);border-radius:999px;background:transparent;color:var(--color-fg-muted);cursor:pointer}
+.gx-chips button i{width:.65rem;height:.65rem;border-radius:50%;display:inline-block;opacity:.35}
+.gx-chips button[aria-pressed="true"]{color:var(--color-fg);border-color:var(--cds-border);background:var(--color-bg);font-weight:var(--cds-font-weight-medium)}
+.gx-chips button[aria-pressed="true"] i{opacity:1}
+.gx-legend{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs) var(--cds-gap-md);font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.gx-legend span{display:inline-flex;align-items:center;gap:.35rem}
+.gx-legend i{width:.7rem;height:.7rem;border-radius:2px;display:inline-block}
+.gx-plot{position:relative}
+.gx-chart{min-height:18rem}.gx-chart.gx-short{min-height:14rem}
+.gx-chart svg{display:block;max-width:100%}.gx-chart svg text{font-family:var(--font-sans)}
+.gx-tip{position:absolute;pointer-events:none;background:var(--cds-surface-popover);border:1px solid var(--cds-border);border-radius:var(--cds-radius);box-shadow:var(--cds-shadow-popover);padding:var(--cds-pad-xs) var(--cds-pad-sm);font-size:var(--cds-font-size-caption);white-space:nowrap;display:none;z-index:2}
+.gx-tip div:first-child{color:var(--cds-text-secondary)}
+.gx-tablewrap{max-height:26rem;overflow:auto}
+.gx-table{width:100%;border-collapse:collapse}
+.gx-table th{position:sticky;top:0;background:var(--color-panel);text-align:right;font-weight:var(--cds-font-weight-medium);font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:.4rem .6rem;border-bottom:1px solid var(--color-border-line)}
+.gx-table td{text-align:right;padding:.4rem .6rem;border-bottom:1px solid var(--color-border-line)}
+.gx-table th:first-child,.gx-table td:first-child,.gx-table th:nth-child(2),.gx-table td:nth-child(2){text-align:left}
+.gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
+.gx-empty{color:var(--color-fg-muted);padding:2rem 0;text-align:center}
+</style></head>
+<body><div class="wrap">
+<div class="gx-page">
+
+  <section class="gx-card gx-ctrl" aria-label="조회 조건">
+    <div class="gx-row">
+      <label>시군구<select id="region"></select></label>
+    </div>
+    <div class="gx-row">
+      <label>시작월<select id="from"></select></label>
+      <label>종료월<select id="to"></select></label>
+      <button id="go">조회</button><span id="status"></span>
+    </div>
+    <div class="gx-row">
+      <label>아파트명<select id="apt" disabled style="min-width:20rem"><option>조회 후 선택</option></select></label>
+      <button id="addCmp" type="button" class="sec" disabled>＋ 비교에 추가</button>
+    </div>
+  </section>
+
+  <div class="gx-chips" id="tabs" role="group" aria-label="보기 전환">
+    <button type="button" data-view="detail" aria-pressed="true">단지 상세</button>
+    <button type="button" data-view="cmp" aria-pressed="false">단지 비교 <span id="cmpN"></span></button>
+  </div>
+
+  <div id="cmp" hidden>
+    <div class="gx-page">
+      <header class="gx-head"><h1>단지 비교</h1><p id="c-sub"></p></header>
+      <div class="gx-card gx-empty" id="c-empty">단지 상세 화면에서 <b>＋ 비교에 추가</b>를 눌러 단지를 담아 주세요.<br>시군구를 바꿔 다시 조회한 단지도 이어서 담을 수 있습니다. (최대 8개)</div>
+      <div class="gx-page" id="c-body">
+        <section class="gx-card"><h2>비교 단지</h2><div class="gx-chips" id="c-apts"></div></section>
+        <div class="gx-pickbar">
+          <span class="gx-lab">평형 선택</span>
+          <div class="gx-chips" id="c-sizes" role="group" aria-label="평형 선택"></div>
+          <label class="gx-hint gx-inline" style="display:inline-flex">지표
+            <select id="c-metric" style="font:inherit;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem">
+              <option value="price">거래가(만원)</option><option value="ppy">전용 평당가(만원)</option>
+            </select></label>
+        </div>
+        <section class="gx-card">
+          <h2 id="c-h-line">월별 평균</h2>
+          <p class="gx-note">그 달 거래의 평균입니다. 거래가 없는 달은 이어 그리지 않습니다. 점 위에 올리면 건수가 나와요.</p>
+          <div class="gx-legend" id="c-legend"></div>
+          <div class="gx-plot"><div class="gx-chart" id="c-line"></div><div class="gx-tip"></div></div>
+        </section>
+        <section class="gx-card">
+          <h2 id="c-h-bars">연도별 평균</h2>
+          <p class="gx-note">연도마다 단지별 평균을 나란히 놓았습니다. 막대 위에 올리면 건수가 나와요.</p>
+          <div class="gx-plot"><div class="gx-chart gx-short" id="c-bars"></div><div class="gx-tip"></div></div>
+        </section>
+        <section class="gx-card">
+          <h2>단지별 요약표</h2>
+          <p class="gx-note" id="c-note-table"></p>
+          <div class="gx-tablewrap">
+            <table class="gx-table" id="c-tbl">
+              <thead><tr><th>단지</th><th>지역</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th><th>최근 6개월 평균</th><th>최근 거래</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="dash" hidden>
+    <div class="gx-page">
+      <header class="gx-head" id="top">
+        <h1 id="h-title"></h1>
+        <p id="h-sub"></p>
+      </header>
+
+      <section id="tiles" aria-label="평형별 평균가"><div class="gx-tiles" id="tile-box"></div></section>
+
+      <div class="gx-pickbar" id="pickbar">
+        <span class="gx-lab">평형 선택</span>
+        <div class="gx-chips" id="chips-pick" role="group" aria-label="평형 선택"></div>
+        <span class="gx-hint">아래 그래프와 표가 모두 고른 평형에 맞춰 바뀝니다.</span>
+      </div>
+
+      <section class="gx-card">
+        <h2 id="h-monthly">월별 평균 거래가</h2>
+        <p class="gx-note">그 달에 거래된 가격의 평균입니다. 점 위에 올리면 건수가 나와요. 거래가 없는 달은 이어 그리지 않습니다.</p>
+        <div class="gx-plot"><div class="gx-chart" id="chart-all"></div><div class="gx-tip"></div></div>
+      </section>
+
+      <section class="gx-card">
+        <h2 id="h-year">월별·연도별 비교</h2>
+        <div class="gx-legend" id="legend-year"></div>
+        <div class="gx-plot"><div class="gx-chart" id="chart-year"></div><div class="gx-tip"></div></div>
+        <p class="gx-note">1월부터 12월까지 같은 달끼리 겹쳐 놓았습니다. 같은 달의 연도별 가격을 바로 비교할 수 있어요.</p>
+        <p class="gx-note" id="note-mix" hidden>"전체"는 모든 평형을 합쳐 평균한 값이라, 그 달에 어떤 평형이 많이 거래됐는지에 따라 오르내릴 수 있어요.</p>
+      </section>
+
+      <div class="gx-grid">
+        <section class="gx-card">
+          <h2 id="h-bars">연도별 평균가</h2>
+          <p class="gx-note" id="note-bars"></p>
+          <div class="gx-legend" id="legend-bars"></div>
+          <div class="gx-plot"><div class="gx-chart gx-short" id="chart-bars"></div><div class="gx-tip"></div></div>
+        </section>
+        <section class="gx-card">
+          <h2 id="h-count">월별 거래 건수</h2>
+          <p class="gx-note" id="note-count"></p>
+          <div class="gx-plot"><div class="gx-chart gx-short" id="chart-count"></div><div class="gx-tip"></div></div>
+        </section>
+      </div>
+
+      <section class="gx-card">
+        <h2 id="h-table">연도별 요약표</h2>
+        <p class="gx-note" id="note-table"></p>
+        <div class="gx-tablewrap">
+          <table class="gx-table" id="tbl">
+            <thead><tr><th>평형</th><th>연도</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="gx-card">
+        <h2>거래 내역</h2>
+        <p class="gx-note" id="note-list"></p>
+        <div class="gx-tablewrap">
+          <table class="gx-table" id="tlist">
+            <thead><tr><th>계약일</th><th>평형</th><th>전용(㎡)</th><th>층</th><th>거래가(만원)</th><th>유형</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 해제(취소) 거래는 제외했고, 평형은 전용면적을 기준으로 묶었습니다.</p>
+    </div>
+  </div>
+</div></div>
+
+<script>
+const ALL = '전체';
+const PY = 3.3058;
+const $ = (id) => document.getElementById(id);
+const q = (s) => document.querySelector(s);
+const fmt = d3.format(',');
+const eok = (v) => d3.format('.1f')(v / 10000);
+const won = (v) => { const e = Math.floor(v / 10000), m = Math.round(v % 10000); return (e ? e + '억 ' : '') + (m ? fmt(m) + '만' : '') + '원'; };
+const col = (i) => `var(--c${i % 8})`;
+const pyeong = (a) => Math.round(a / PY);
+
+const state = { view: 'detail', cmp: [], regions: [], raw: [], from: '', to: '', trades: [], sizes: [], pick: ALL, apt: null };
+
+/* ---------- 조회 조건 ---------- */
+const sel = $('region');
+fetch('/regions.json').then((r) => r.json()).then((list) => {
+  state.regions = list;
+  const groups = new Map();
+  for (const r of list) (groups.get(r.sido) || groups.set(r.sido, []).get(r.sido)).push(r);
+  for (const [sido, items] of groups) {
+    const og = document.createElement('optgroup'); og.label = sido;
+    for (const r of items) og.append(new Option(`${r.name} (${r.code})`, r.code));
+    sel.append(og);
+  }
+  sel.value = '41115'; // 수원시 팔달구
+});
+
+const now = new Date();
+const ym = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+for (let i = 0; i < 120; i++) {
+  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  const label = `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+  $('from').append(new Option(label, ym(d)));
+  $('to').append(new Option(label, ym(d)));
+}
+$('to').value = ym(now);
+$('from').value = ym(new Date(now.getFullYear() - 1, now.getMonth(), 1));
+
+$('go').onclick = async () => {
+  const btn = $('go'), st = $('status');
+  btn.disabled = true; st.className = '';
+  st.textContent = '불러오는 중… (처음엔 기간에 따라 수십 초 걸릴 수 있습니다)';
+  try {
+    const from = $('from').value, to = $('to').value;
+    if (from > to) throw new Error('시작월이 종료월보다 늦습니다.');
+    const r = await fetch('/api/trades?' + new URLSearchParams({ lawd: sel.value, from, to }));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    state.from = from; state.to = to;
+    state.raw = j.trades.filter((t) => !t.canceled);
+    st.textContent = `거래 ${state.raw.length.toLocaleString()}건 (해제 제외)`;
+    buildAptOptions();
+  } catch (e) { st.className = 'err'; st.textContent = e.message; }
+  btn.disabled = false;
+};
+
+const aptKey = (t) => t.dong + '|' + t.apt;
+
+function buildAptOptions() {
+  const cnt = new Map();
+  for (const t of state.raw) {
+    const k = aptKey(t);
+    (cnt.get(k) || cnt.set(k, { n: 0, apt: t.apt, dong: t.dong }).get(k)).n++;
+  }
+  const el = $('apt');
+  el.innerHTML = '';
+  const list = [...cnt].sort((a, b) => b[1].n - a[1].n || a[1].apt.localeCompare(b[1].apt, 'ko'));
+  if (!list.length) {
+    el.append(new Option('거래 없음', '')); el.disabled = true;
+    state.trades = []; $('addCmp').disabled = true; applyView(); return;
+  }
+  for (const [k, o] of list) el.append(new Option(`${o.apt} · ${o.dong} (${o.n}건)`, k));
+  el.disabled = false;
+  el.value = list[0][0];
+  selectApt();
+}
+$('apt').onchange = selectApt;
+
+/* 전용면적을 가까운 것끼리 묶어 평형 구간 생성 (84.43㎡·84.97㎡ → "84㎡" 하나) */
+function buildSizes(trades) {
+  const areas = [...new Set(trades.map((t) => t.area))].sort((a, b) => a - b);
+  const clusters = [];
+  for (const a of areas) {
+    const c = clusters[clusters.length - 1];
+    if (c && a - c.lo <= 1.5) { c.hi = a; c.areas.push(a); } else clusters.push({ lo: a, hi: a, areas: [a] });
+  }
+  for (const c of clusters) {
+    const mean = c.areas.reduce((s, x) => s + x, 0) / c.areas.length;
+    c.area = Math.floor(mean); c.label = c.area + '㎡'; c.py = pyeong(mean);  // 소수점 버림: 84.97㎡ → 84㎡
+  }
+  for (const t of trades) t.size = clusters.find((c) => t.area >= c.lo && t.area <= c.hi).label;
+  return clusters;
+}
+
+function selectApt() {
+  const key = $('apt').value;
+  if (!key) return;
+  $('addCmp').disabled = false;
+  state.trades = state.raw.filter((t) => aptKey(t) === key).map((t) => ({
+    ...t, ym: t.date.slice(0, 7), year: +t.date.slice(0, 4), month: +t.date.slice(5, 7), day: +t.date.slice(8, 10),
+  }));
+  state.sizes = buildSizes(state.trades);
+  state.pick = ALL;
+  const t0 = state.trades[0];
+  const reg = state.regions.find((r) => r.code === sel.value) || { sido: '', name: '' };
+  const dongs = d3.rollups(state.trades, (v) => v.length, (t) => t.dong).sort((a, b) => b[1] - a[1]);
+  state.apt = t0.apt;
+  $('h-title').textContent = `${t0.apt} 실거래가`;
+  $('h-sub').textContent = `${reg.sido} ${reg.name} ${dongs[0][0]} · 아파트 매매 · 전용면적(평형)별 · 단위 만원 · 해제(취소) 거래 제외 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)}`;
+  document.title = `${t0.apt} 실거래가`;
+
+  const chips = $('chips-pick');
+  chips.replaceChildren();
+  [ALL, ...state.sizes.map((s) => s.label)].forEach((s) => {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.size = s;
+    const i = document.createElement('i');
+    i.style.background = s === ALL ? 'var(--color-fg-muted)' : col(state.sizes.findIndex((z) => z.label === s));
+    const z = state.sizes.find((x) => x.label === s);
+    b.append(i, document.createTextNode(s === ALL ? '전체' : `${s} (약 ${z.py}평)`));
+    b.addEventListener('click', () => { state.pick = s; render(); });
+    chips.append(b);
+  });
+  applyView();
+  render();
+}
+const ymLabel = (s) => `${s.slice(0, 4)}년 ${+s.slice(4)}월`;
+
+/* ---------- 차트 공통 ---------- */
+function tip(el, lines, x, y) {
+  const t = el.parentNode.querySelector('.gx-tip');
+  t.replaceChildren(...lines.map((s) => { const d = document.createElement('div'); d.textContent = s; return d; }));
+  t.style.display = 'block';
+  const w = t.offsetWidth, W = el.parentNode.clientWidth;
+  t.style.left = Math.max(0, Math.min(W - w, x + 12)) + 'px';
+  t.style.top = Math.max(0, y - 44) + 'px';
+}
+const hideTip = (el) => { el.parentNode.querySelector('.gx-tip').style.display = 'none'; };
+function axisStyle(g) {
+  g.attr('font-size', null).attr('font-family', null);
+  g.selectAll('text').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+  g.selectAll('line,path').style('stroke', 'var(--cds-chart-axis)');
+}
+function legend(el, items) {
+  el.replaceChildren(...items.map((it) => {
+    const s = document.createElement('span'), i = document.createElement('i');
+    i.style.background = it.color; s.append(i, document.createTextNode(it.name)); return s;
+  }));
+}
+function lineChart(el, o) {
+  el.replaceChildren();
+  const W = Math.max(el.clientWidth, 280), H = o.h || 300;
+  const m = { t: 12, r: o.end ? 52 : 16, b: 28, l: 46 };
+  const all = o.series.flatMap((s) => s.pts);
+  if (!all.length) { el.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; return; }
+  const ymin = d3.min(all, (p) => p.y), ymax = d3.max(all, (p) => p.y);
+  const pad = (ymax - ymin) * 0.08 || 1000;
+  const y = d3.scaleLinear([ymin - pad, ymax + pad], [H - m.b, m.t]).nice();
+  const x = o.x.range([m.l, W - m.r]);
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+  svg.append('g').selectAll('line').data(y.ticks(5)).join('line')
+    .attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+  axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(o.xticks).tickFormat(o.xfmt).tickSizeOuter(0)));
+  axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(o.yfmt || ((d) => eok(d) + '억')).tickSize(0)).call((g) => g.select('.domain').remove()));
+  for (const s of o.series) {
+    const segs = []; let cur = [];
+    s.pts.forEach((p, i) => { if (i && o.gap(s.pts[i - 1], p)) { segs.push(cur); cur = []; } cur.push(p); });
+    if (cur.length) segs.push(cur);
+    for (const sg of segs) if (sg.length > 1)
+      svg.append('path').attr('d', d3.line().x((p) => x(p.x)).y((p) => y(p.y))(sg)).attr('fill', 'none')
+        .attr('stroke-width', 2.5).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').style('stroke', s.color);
+    svg.selectAll(null).data(s.pts).join('circle').attr('cx', (p) => x(p.x)).attr('cy', (p) => y(p.y)).attr('r', 3.2).style('fill', s.color);
+  }
+  if (o.end) {
+    const ls = o.series.filter((s) => s.pts.length).map((s) => ({ s, py: y(s.pts.at(-1).y), px: x(s.pts.at(-1).x) })).sort((a, b) => a.py - b.py);
+    for (let i = 1; i < ls.length; i++) if (ls[i].py - ls[i - 1].py < 13) ls[i].py = ls[i - 1].py + 13;
+    for (const l of ls) svg.append('text').attr('x', l.px + 7).attr('y', l.py + 4).text(l.s.name)
+      .style('font-size', 'var(--cds-font-size-caption)').style('fill', l.s.color).style('font-weight', 600);
+  }
+  const dot = svg.append('circle').attr('r', 5.5).attr('fill', 'none').attr('stroke-width', 2).style('display', 'none');
+  const flat = o.series.flatMap((s) => s.pts.map((p) => ({ s, p })));
+  svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const [mx, my] = d3.pointer(ev);
+      let best = null, bd = Infinity;
+      for (const f of flat) { const d = (x(f.p.x) - mx) ** 2 + (y(f.p.y) - my) ** 2; if (d < bd) { bd = d; best = f; } }
+      if (!best) return;
+      dot.style('display', null).attr('cx', x(best.p.x)).attr('cy', y(best.p.y)).style('stroke', best.s.color);
+      tip(el, [o.tipTitle(best.p), `${best.s.name} ${(o.valfmt || won)(best.p.y)} · ${best.p.n}건`], x(best.p.x), y(best.p.y));
+    })
+    .on('pointerleave', () => { dot.style('display', 'none'); hideTip(el); });
+}
+
+/* ---------- 집계 ---------- */
+const avg = (a) => (a.length ? a.reduce((s, r) => s + r.price, 0) / a.length : null);
+const monthsInRange = (from = state.from, to = state.to) => {
+  const out = []; let y = +from.slice(0, 4), m = +from.slice(4);
+  const ey = +to.slice(0, 4), em = +to.slice(4);
+  while (y < ey || (y === ey && m <= em)) { out.push(`${y}-${String(m).padStart(2, '0')}`); if (++m > 12) { m = 1; y++; } }
+  return out;
+};
+
+/* ---------- 렌더 ---------- */
+function render() {
+  if (!state.trades.length) return;
+  const { sizes, pick, trades } = state;
+  const where = pick === ALL ? '전체 평형' : '전용 ' + pick;
+  const sub = pick === ALL ? trades : trades.filter((t) => t.size === pick);
+  const labels = sizes.map((s) => s.label);
+  const months = monthsInRange();
+  const years = [...new Set(months.map((m) => +m.slice(0, 4)))];
+
+  [...q('#chips-pick').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.size === pick)));
+
+  // 타일: 종료월이 속한 연도 평균, 전년 대비
+  const endY = +state.to.slice(0, 4);
+  q('#tile-box').replaceChildren(...sizes.map((s, i) => {
+    const a = trades.filter((t) => t.size === s.label && t.year === endY);
+    const b = trades.filter((t) => t.size === s.label && t.year === endY - 1);
+    const aa = avg(a), bb = avg(b);
+    const t = document.createElement('div'); t.className = 'gx-tile' + (pick === s.label ? ' gx-on' : '');
+    t.innerHTML = `<div class="gx-k">전용 ${s.label} · 약 ${s.py}평</div>
+      <div class="gx-v">${aa == null ? '—' : fmt(Math.round(aa))}<small>만원</small></div>
+      <div class="gx-d">${endY - 1}년 대비 ${aa && bb ? d3.format('+.1%')(aa / bb - 1) : '—'} · ${endY}년 ${a.length}건</div>`;
+    t.addEventListener('click', () => { state.pick = s.label; render(); });
+    return t;
+  }));
+
+  q('#h-monthly').textContent = '월별 평균 거래가 · ' + where;
+  q('#h-year').textContent = '월별·연도별 비교 · ' + where;
+  q('#note-mix').hidden = pick !== ALL;
+
+  // 차트 1: 월별 평균 (평형별 선)
+  const e1 = q('#chart-all');
+  const parse = (s) => new Date(s + '-01T00:00:00Z');
+  const series1 = sizes.map((s, i) => ({
+    name: s.label, color: col(i),
+    pts: months.map((mo) => ({ mo, rows: trades.filter((t) => t.size === s.label && t.ym === mo) }))
+      .filter((o) => o.rows.length).map((o) => ({ x: parse(o.mo), y: avg(o.rows), n: o.rows.length, ym: o.mo })),
+  })).filter((s) => s.pts.length && (pick === ALL || s.name === pick));
+  const narrow = e1.clientWidth < 520;
+  const step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
+  lineChart(e1, {
+    series: series1, h: 320, end: true,
+    x: d3.scaleUtc().domain([parse(months[0]), parse(months.at(-1))]),
+    xticks: d3.utcMonth.every(narrow ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'),
+    gap: (a, b) => (b.x - a.x) / 2592000000 > 3.5,
+    tipTitle: (p) => p.ym.replace('-', '년 ') + '월',
+  });
+
+  // 차트 2: 월별·연도별 겹쳐보기
+  const e2 = q('#chart-year');
+  const series2 = years.map((yr, i) => ({
+    name: yr + '년', color: col(i),
+    pts: d3.range(1, 13).map((mo) => ({ mo, rows: sub.filter((t) => t.year === yr && t.month === mo) }))
+      .filter((o) => o.rows.length).map((o) => ({ x: o.mo, y: avg(o.rows), n: o.rows.length, year: yr })),
+  })).filter((s) => s.pts.length);
+  legend(q('#legend-year'), series2.map((s) => ({ name: s.name, color: s.color })));
+  lineChart(e2, {
+    series: series2, h: 300, end: false,
+    x: d3.scaleLinear().domain([1, 12]), xticks: 12, xfmt: (d) => d + '월',
+    gap: (a, b) => b.x - a.x > 2, tipTitle: (p) => `${p.year}년 ${p.x}월`,
+  });
+
+  // 차트 3: 연도별 평균가 막대
+  const e3 = q('#chart-bars');
+  q('#h-bars').textContent = pick === ALL ? '연도·평형별 평균가' : '연도별 평균가 · ' + where;
+  q('#note-bars').textContent = pick === ALL ? '평형마다 연도별 평균을 나란히 놓았습니다. 막대 위에 올리면 건수가 나와요.' : '고른 평형의 연도별 평균입니다. 막대 위 숫자는 억 단위예요.';
+  e3.replaceChildren();
+  const yrRows = d3.rollups(trades, (v) => ({ avg: avg(v), n: v.length, min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) }),
+    (t) => t.size, (t) => t.year).flatMap(([size, ys]) => ys.map(([year, o]) => ({ size, year, ...o })));
+  const rows3 = pick === ALL ? yrRows : yrRows.filter((r) => r.size === pick);
+  {
+    const W = Math.max(e3.clientWidth, 280), H = 224, m = { t: 24, r: 8, b: 28, l: 46 };
+    const y = d3.scaleLinear([0, (d3.max(rows3, (r) => r.avg) || 1) * 1.05], [H - m.b, m.t]).nice();
+    const svg = d3.select(e3).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat((d) => eok(d) + '억').tickSize(0)).call((g) => g.select('.domain').remove()));
+    const onTip = (s) => s
+      .on('pointermove', (ev, r) => { const [mx, my] = d3.pointer(ev, e3); tip(e3, [`전용 ${r.size} · ${r.year}년`, `평균 ${won(r.avg)} · ${r.n}건`], mx, my); })
+      .on('pointerleave', () => hideTip(e3));
+    if (pick === ALL) {
+      legend(q('#legend-bars'), years.map((yr, i) => ({ name: yr + '년', color: col(i) })));
+      const x0 = d3.scaleBand(labels, [m.l, W - m.r]).paddingInner(0.2);
+      const x1 = d3.scaleBand(years.map(String), [0, x0.bandwidth()]).padding(0.08);
+      axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x0).tickSizeOuter(0)));
+      onTip(svg.append('g').selectAll('rect').data(rows3).join('rect')
+        .attr('x', (r) => x0(r.size) + x1(String(r.year))).attr('width', x1.bandwidth())
+        .attr('y', (r) => y(r.avg)).attr('height', (r) => y(0) - y(r.avg)).attr('rx', 3).style('fill', (r) => col(years.indexOf(r.year))));
+    } else {
+      legend(q('#legend-bars'), []);
+      const x = d3.scaleBand(years.map(String), [m.l, W - m.r]).padding(0.35);
+      const bw = Math.min(x.bandwidth(), 72), off = (x.bandwidth() - bw) / 2;
+      axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickFormat((d) => d + '년').tickSizeOuter(0)));
+      onTip(svg.append('g').selectAll('rect').data(rows3).join('rect')
+        .attr('x', (r) => x(String(r.year)) + off).attr('width', bw)
+        .attr('y', (r) => y(r.avg)).attr('height', (r) => y(0) - y(r.avg)).attr('rx', 4).style('fill', (r) => col(years.indexOf(r.year))));
+      svg.append('g').selectAll('text').data(rows3).join('text')
+        .attr('x', (r) => x(String(r.year)) + x.bandwidth() / 2).attr('y', (r) => y(r.avg) - 6).attr('text-anchor', 'middle')
+        .text((r) => eok(r.avg) + '억').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg)');
+      const have = new Set(rows3.map((r) => r.year));
+      svg.append('g').selectAll('text').data(years.filter((yr) => !have.has(yr))).join('text')
+        .attr('x', (yr) => x(String(yr)) + x.bandwidth() / 2).attr('y', H - m.b - 8).attr('text-anchor', 'middle')
+        .text('거래 없음').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+    }
+  }
+
+  // 차트 4: 월별 거래 건수
+  const e4 = q('#chart-count');
+  q('#h-count').textContent = pick === ALL ? '월별 거래 건수 · 전체 평형 합계' : '월별 거래 건수 · ' + where;
+  q('#note-count').textContent = pick === ALL ? '모든 평형을 합친 월별 거래 건수입니다.' : '고른 평형의 월별 거래 건수입니다.';
+  e4.replaceChildren();
+  {
+    const cnt = d3.rollup(sub, (v) => v.length, (t) => t.ym);
+    const rows = months.map((mo) => ({ ym: mo, n: cnt.get(mo) || 0 }));
+    const W = Math.max(e4.clientWidth, 280), H = 224, m = { t: 10, r: 8, b: 28, l: 34 };
+    const x = d3.scaleBand(rows.map((r) => r.ym), [m.l, W - m.r]).padding(0.25);
+    const y = d3.scaleLinear([0, Math.max(3, (d3.max(rows, (r) => r.n) || 0) * 1.08)], [H - m.b, m.t]).nice();
+    const yt = y.ticks(4).filter(Number.isInteger);
+    const svg = d3.select(e4).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    svg.append('g').selectAll('line').data(yt).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    const st = Math.max(1, Math.ceil(rows.length / (e4.clientWidth < 420 ? 4 : 8)));
+    const ticks = rows.map((r) => r.ym).filter((_, i) => i % st === 0);
+    axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(ticks).tickFormat((s) => s.slice(2).replace('-', '.')).tickSizeOuter(0)));
+    axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(yt).tickFormat(d3.format('d')).tickSize(0)).call((g) => g.select('.domain').remove()));
+    svg.append('g').selectAll('rect').data(rows).join('rect')
+      .attr('x', (r) => x(r.ym)).attr('width', x.bandwidth()).attr('y', (r) => y(r.n)).attr('height', (r) => y(0) - y(r.n)).attr('rx', 2).style('fill', col(0))
+      .on('pointermove', (ev, r) => { const [mx, my] = d3.pointer(ev, e4); tip(e4, [r.ym.replace('-', '년 ') + '월', r.n + '건'], mx, my); })
+      .on('pointerleave', () => hideTip(e4));
+  }
+
+  // 요약표
+  q('#h-table').textContent = pick === ALL ? '연도·평형별 요약표' : '연도별 요약표 · ' + where;
+  q('#note-table').textContent = pick === ALL ? '금액 단위는 만원입니다. 맨 아래 "전체" 줄은 모든 평형을 합친 값이에요.' : '고른 평형의 요약입니다. 금액 단위는 만원이고, 건수가 적은 해는 한 건의 가격이 평균을 좌우합니다.';
+  const summ = (size, year, v) => ({ size, year, n: v.length, avg: avg(v), min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) });
+  const tbl = [];
+  for (const s of labels) for (const yr of years) {
+    const v = trades.filter((t) => t.size === s && t.year === yr);
+    if (v.length && (pick === ALL || pick === s)) tbl.push(summ(s, yr, v));
+  }
+  if (pick === ALL) for (const yr of years) { const v = trades.filter((t) => t.year === yr); if (v.length) tbl.push(summ(ALL, yr, v)); }
+  q('#tbl tbody').replaceChildren(...tbl.map((r) => {
+    const tr = document.createElement('tr');
+    [r.size, String(r.year), fmt(r.n), fmt(Math.round(r.avg)), fmt(r.min), fmt(r.max)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    return tr;
+  }));
+
+  // 거래 내역
+  const list = [...sub].sort((a, b) => (a.date < b.date ? 1 : -1));
+  q('#note-list').textContent = `${where} · ${list.length.toLocaleString()}건 · 최근 거래순`;
+  q('#tlist tbody').replaceChildren(...list.slice(0, 500).map((r) => {
+    const tr = document.createElement('tr');
+    [r.date, r.size, r.area, r.floor, fmt(r.price), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    return tr;
+  }));
+}
+
+/* ---------- 단지 비교 ---------- */
+state.cmpPick = null;
+state.cmpMetric = 'price';
+
+function applyView() {
+  $('dash').hidden = state.view !== 'detail' || !state.trades.length;
+  $('cmp').hidden = state.view !== 'cmp';
+  [...$('tabs').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
+  $('cmpN').textContent = state.cmp.length ? `(${state.cmp.length})` : '';
+  if (state.view === 'cmp') renderCompare();
+}
+[...$('tabs').children].forEach((b) => b.addEventListener('click', () => { state.view = b.dataset.view; applyView(); }));
+
+$('addCmp').onclick = () => {
+  const st = $('status');
+  if (!state.trades.length) return;
+  const reg = state.regions.find((r) => r.code === sel.value) || { name: '' };
+  const t0 = state.trades[0];
+  const id = sel.value + '|' + aptKey(t0);
+  st.className = '';
+  if (state.cmp.some((e) => e.id === id)) { st.textContent = '이미 비교 목록에 있습니다.'; return; }
+  if (state.cmp.length >= 8) { st.className = 'err'; st.textContent = '비교는 최대 8개 단지까지 가능합니다.'; return; }
+  state.cmp.push({ id, apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes });
+  st.textContent = `비교 목록에 추가했습니다 (${state.cmp.length}개)`;
+  applyView();
+};
+
+$('c-metric').onchange = () => { state.cmpMetric = $('c-metric').value; renderCompare(); };
+
+function renderCompare() {
+  const E = state.cmp;
+  $('c-empty').hidden = E.length > 0;
+  $('c-body').hidden = E.length === 0;
+  if (!E.length) { $('c-sub').textContent = ''; return; }
+
+  const metric = state.cmpMetric;
+  const val = (t) => (metric === 'price' ? t.price : t.price / (t.area / PY));
+  const vfmt = metric === 'price' ? won : (v) => fmt(Math.round(v)) + '만원';
+  const yfmt = metric === 'price' ? (d) => eok(d) + '억' : (d) => fmt(Math.round(d));
+  const avgV = (rows) => (rows.length ? d3.mean(rows, val) : null);
+  const mname = metric === 'price' ? '거래가' : '전용 평당가';
+
+  // 평형: 담긴 단지들의 평형 합집합 (기본은 가장 많은 단지에 있는 평형)
+  const sizeCount = new Map(), sizePy = new Map();
+  for (const e of E) for (const s of e.sizes) { sizeCount.set(s.label, (sizeCount.get(s.label) || 0) + 1); sizePy.set(s.label, s.py); }
+  const labels = [...sizeCount.keys()].sort((a, b) => parseInt(a) - parseInt(b));
+  if (state.cmpPick !== ALL && !sizeCount.has(state.cmpPick)) {
+    state.cmpPick = [...sizeCount].sort((a, b) => b[1] - a[1] || parseInt(a[0]) - parseInt(b[0]))[0][0];
+  }
+  const pick = state.cmpPick;
+  const where = pick === ALL ? '전체 평형' : '전용 ' + pick;
+  const rowsOf = (e) => (pick === ALL ? e.trades : e.trades.filter((t) => t.size === pick));
+  const name = (e) => `${e.apt} (${e.dong})`;
+
+  $('c-sub').textContent = `${E.length}개 단지 · ${where} · ${mname} 기준 · 단위 만원 · 해제(취소) 거래 제외`;
+
+  // 단지 칩 (클릭하면 제거)
+  const ca = $('c-apts'); ca.replaceChildren();
+  E.forEach((e, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', 'true'); b.title = '클릭하면 비교에서 제거';
+    const d = document.createElement('i'); d.style.background = col(i);
+    b.append(d, document.createTextNode(`${name(e)} · ${e.regionName} ✕`));
+    b.addEventListener('click', () => { state.cmp.splice(i, 1); applyView(); });
+    ca.append(b);
+  });
+
+  // 평형 칩
+  const cs = $('c-sizes'); cs.replaceChildren();
+  [ALL, ...labels].forEach((s) => {
+    const b = document.createElement('button'); b.type = 'button';
+    const have = s === ALL ? E.length : sizeCount.get(s);
+    b.append(document.createTextNode(s === ALL ? '전체' : `${s} (약 ${sizePy.get(s)}평) · ${have}/${E.length}단지`));
+    b.setAttribute('aria-pressed', String(s === pick));
+    b.addEventListener('click', () => { state.cmpPick = s; renderCompare(); });
+    cs.append(b);
+  });
+  $('c-metric').value = metric;
+
+  // 월별 평균 선
+  const from = E.map((e) => e.from).sort()[0], to = E.map((e) => e.to).sort().at(-1);
+  const months = monthsInRange(from, to);
+  const parse = (s) => new Date(s + '-01T00:00:00Z');
+  const series = E.map((e, i) => {
+    const byM = d3.group(rowsOf(e), (t) => t.ym);
+    return { name: name(e), color: col(i),
+      pts: months.filter((m) => byM.has(m)).map((m) => ({ x: parse(m), y: avgV(byM.get(m)), n: byM.get(m).length, ym: m })) };
+  });
+  legend($('c-legend'), series.map((s) => ({ name: s.name, color: s.color })));
+  $('c-h-line').textContent = `월별 평균 ${mname} · ${where}`;
+  const e1 = $('c-line'), step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
+  lineChart(e1, {
+    series: series.filter((s) => s.pts.length), h: 320, end: false,
+    x: d3.scaleUtc().domain([parse(months[0]), parse(months.at(-1))]),
+    xticks: d3.utcMonth.every(e1.clientWidth < 520 ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'),
+    gap: (a, b) => (b.x - a.x) / 2592000000 > 3.5, tipTitle: (p) => p.ym.replace('-', '년 ') + '월',
+    yfmt, valfmt: vfmt,
+  });
+
+  // 연도별 막대 (연도 × 단지)
+  $('c-h-bars').textContent = `연도별 평균 ${mname} · ${where}`;
+  const e2 = $('c-bars'); e2.replaceChildren();
+  const years = [...new Set(months.map((m) => +m.slice(0, 4)))];
+  const bars = [];
+  E.forEach((e, i) => { for (const [yr, v] of d3.group(rowsOf(e), (t) => t.year)) bars.push({ i, name: name(e), year: yr, avg: avgV(v), n: v.length }); });
+  if (!bars.length) { e2.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; }
+  else {
+    const W = Math.max(e2.clientWidth, 280), H = 240, m = { t: 20, r: 8, b: 28, l: 46 };
+    const y = d3.scaleLinear([0, d3.max(bars, (r) => r.avg) * 1.05], [H - m.b, m.t]).nice();
+    const svg = d3.select(e2).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+    axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(yfmt).tickSize(0)).call((g) => g.select('.domain').remove()));
+    const x0 = d3.scaleBand(years.map(String), [m.l, W - m.r]).paddingInner(0.2);
+    const x1 = d3.scaleBand(E.map((_, i) => String(i)), [0, x0.bandwidth()]).padding(0.08);
+    axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x0).tickFormat((d) => d + '년').tickSizeOuter(0)));
+    svg.append('g').selectAll('rect').data(bars).join('rect')
+      .attr('x', (r) => x0(String(r.year)) + x1(String(r.i))).attr('width', x1.bandwidth())
+      .attr('y', (r) => y(r.avg)).attr('height', (r) => y(0) - y(r.avg)).attr('rx', 3).style('fill', (r) => col(r.i))
+      .on('pointermove', (ev, r) => { const [mx, my] = d3.pointer(ev, e2); tip(e2, [`${r.name} · ${r.year}년`, `평균 ${vfmt(r.avg)} · ${r.n}건`], mx, my); })
+      .on('pointerleave', () => hideTip(e2));
+  }
+
+  // 요약표
+  const cut = months.length > 6 ? months[months.length - 6] : months[0];
+  $('c-note-table').textContent = `${where} · ${mname} 기준, 금액 단위 만원. "최근 6개월"은 ${ymLabel(cut.replace('-', ''))} 이후 거래입니다.`;
+  $('c-tbl').querySelector('tbody').replaceChildren(...E.map((e) => {
+    const r = rowsOf(e), v = r.map(val), recent = r.filter((t) => t.ym >= cut);
+    const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
+    const tr = document.createElement('tr');
+    [name(e), e.regionName, fmt(r.length), r.length ? fmt(Math.round(d3.mean(v))) : '—', r.length ? fmt(Math.round(d3.min(v))) : '—',
+      r.length ? fmt(Math.round(d3.max(v))) : '—', recent.length ? fmt(Math.round(d3.mean(recent, val))) : '—',
+      last ? `${last.date} · ${fmt(last.price)}` : '—']
+      .forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    return tr;
+  }));
+}
+
+let rt;
+window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (state.view === 'cmp') renderCompare(); else if (state.trades.length) render(); }, 120); });
+</script>
+</body></html>
