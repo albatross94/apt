@@ -216,6 +216,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
             <label>기준연도<select id="gs-year"></select></label>
             <label>동<select id="gs-dong"></select></label>
             <label>평형<select id="gs-size"></select></label>
+            <label>호<select id="gs-ho"></select></label>
             <button type="button" class="gx-xl" id="gs-xl" style="margin-top:0">엑셀로 내보내기 (.xlsx)</button>
           </div></div>
           <p class="gx-note" id="gs-kpi" style="margin-top:.6rem"></p>
@@ -921,7 +922,7 @@ async function loadGongsiYear(year, tk = gs.token) {
   gs.rows.forEach((r) => { r.area = r.a; });
   gs.sizes = buildSizes(gs.rows);   // 가까운 전용면적끼리 묶어 r.size 부여 (상세 화면과 같은 규칙)
   $('gs-year').value = year;
-  $('gs-dong').value = ''; $('gs-size').value = '';
+  $('gs-dong').value = ''; $('gs-size').value = ''; $('gs-ho').value = '';
   refreshGsFilters();
   $('gs-body').hidden = false;
   $('gs-load').textContent = '다시 조회'; $('gs-load').disabled = false;
@@ -932,18 +933,24 @@ async function loadGongsiYear(year, tk = gs.token) {
 $('gs-year').onchange = async () => { try { await loadGongsiYear(Number($('gs-year').value)); } catch (e) { $('gs-status').className = 'gx-note err'; $('gs-status').textContent = e.message; } };
 // 동·평형 드롭다운 연동: 한쪽을 고르면 다른 쪽에는 그 조건에 실제로 있는 항목만 보여준다
 function refreshGsFilters() {
-  const dong = $('gs-dong').value, size = $('gs-size').value;
-  const dongs = [...new Set(gs.rows.filter((r) => !size || r.size === size).map((r) => r.d))];
-  const sizes = gs.sizes.filter((c) => gs.rows.some((r) => r.size === c.label && (!dong || r.d === dong)));
+  const f = { d: $('gs-dong').value, s: $('gs-size').value, h: $('gs-ho').value };
+  // 자기 자신을 뺀 나머지 두 조건에 맞는 호만 놓고 각 드롭다운의 선택지를 만든다
+  const rowsFor = (skip) => gs.rows.filter((r) => (skip === 'd' || !f.d || r.d === f.d) && (skip === 's' || !f.s || r.size === f.s) && (skip === 'h' || !f.h || r.h === f.h));
+  const dongs = [...new Set(rowsFor('d').map((r) => r.d))];
+  const sizeSet = new Set(rowsFor('s').map((r) => r.size));
+  const sizes = gs.sizes.filter((c) => sizeSet.has(c.label));
+  const hos = [...new Set(rowsFor('h').map((r) => r.h))]
+    .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || String(a).localeCompare(String(b), 'ko'));
   $('gs-dong').replaceChildren(new Option('전체', ''), ...dongs.map((x) => new Option(x + '동', x)));
   $('gs-size').replaceChildren(new Option('전체', ''), ...sizes.map((c) => new Option(`${c.label} (약 ${c.py}평)`, c.label)));
-  $('gs-dong').value = dong; $('gs-size').value = size;
+  $('gs-ho').replaceChildren(new Option('전체', ''), ...hos.map((x) => new Option(x + '호', x)));
+  $('gs-dong').value = f.d; $('gs-size').value = f.s; $('gs-ho').value = f.h;
 }
-$('gs-dong').onchange = $('gs-size').onchange = () => { refreshGsFilters(); renderGongsi(); };
+$('gs-dong').onchange = $('gs-size').onchange = $('gs-ho').onchange = () => { refreshGsFilters(); renderGongsi(); };
 
 const gsFiltered = () => {
-  const dong = $('gs-dong').value, size = $('gs-size').value;
-  return gs.rows.filter((r) => (!dong || r.d === dong) && (!size || r.size === size));
+  const dong = $('gs-dong').value, size = $('gs-size').value, ho = $('gs-ho').value;
+  return gs.rows.filter((r) => (!dong || r.d === dong) && (!size || r.size === size) && (!ho || r.h === ho));
 };
 
 function renderGongsi() {
