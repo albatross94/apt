@@ -291,13 +291,15 @@ function buildSizes(trades) {
   return clusters;
 }
 
+const prepTrades = (raw, key) => raw.filter((t) => aptKey(t) === key).map((t) => ({
+  ...t, ym: t.date.slice(0, 7), year: +t.date.slice(0, 4), month: +t.date.slice(5, 7), day: +t.date.slice(8, 10),
+}));
+
 function selectApt() {
   const key = $('apt').value;
   if (!key) return;
   $('addCmp').disabled = false;
-  state.trades = state.raw.filter((t) => aptKey(t) === key).map((t) => ({
-    ...t, ym: t.date.slice(0, 7), year: +t.date.slice(0, 4), month: +t.date.slice(5, 7), day: +t.date.slice(8, 10),
-  }));
+  state.trades = prepTrades(state.raw, key);
   state.sizes = buildSizes(state.trades);
   state.pick = ALL;
   const t0 = state.trades[0];
@@ -575,10 +577,47 @@ $('addCmp').onclick = () => {
   st.className = '';
   if (state.cmp.some((e) => e.id === id)) { st.textContent = '이미 비교 목록에 있습니다.'; return; }
   if (state.cmp.length >= 8) { st.className = 'err'; st.textContent = '비교는 최대 8개 단지까지 가능합니다.'; return; }
-  state.cmp.push({ id, apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes });
+  state.cmp.push({ id, lawd: sel.value, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes });
+  saveCmp();
   st.textContent = `비교 목록에 추가했습니다 (${state.cmp.length}개)`;
   applyView();
 };
+
+/* 비교 목록 유지: 거래 데이터가 아니라 단지 정보만 저장하고, 새로고침 시 서버(캐시)에서 다시 받아 복원 */
+const CMP_KEY = 'aptCompareList.v1';
+function saveCmp() {
+  try {
+    localStorage.setItem(CMP_KEY, JSON.stringify(state.cmp.map(({ id, lawd, key, apt, dong, regionName, from, to }) => ({ id, lawd, key, apt, dong, regionName, from, to }))));
+  } catch {}
+}
+async function restoreCmp() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(CMP_KEY) || '[]'); } catch {}
+  if (!Array.isArray(saved) || !saved.length) return;
+  const st = $('status');
+  st.className = ''; st.textContent = '저장된 비교 목록을 불러오는 중…';
+  const cache = new Map();   // 같은 지역·기간은 한 번만 요청
+  const failed = [];
+  for (const m of saved.slice(0, 8)) {
+    try {
+      const ck = [m.lawd, m.from, m.to].join('|');
+      if (!cache.has(ck)) {
+        const r = await fetch('/api/trades?' + new URLSearchParams({ lawd: m.lawd, from: m.from, to: m.to }));
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error);
+        cache.set(ck, j.trades.filter((t) => !t.canceled));
+      }
+      const trades = prepTrades(cache.get(ck), m.key);
+      if (!trades.length) throw new Error('거래 없음');
+      state.cmp.push({ ...m, trades, sizes: buildSizes(trades) });
+    } catch { failed.push(m.apt); }
+  }
+  saveCmp();
+  st.className = failed.length ? 'err' : '';
+  st.textContent = failed.length ? `비교 목록 ${failed.length}개를 불러오지 못했습니다: ${failed.join(', ')}` : `저장된 비교 목록 ${state.cmp.length}개를 불러왔습니다.`;
+  applyView();
+}
+restoreCmp();
 
 $('c-metric').onchange = () => { state.cmpMetric = $('c-metric').value; renderCompare(); };
 
@@ -615,7 +654,7 @@ function renderCompare() {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', 'true'); b.title = '클릭하면 비교에서 제거';
     const d = document.createElement('i'); d.style.background = col(i);
     b.append(d, document.createTextNode(`${name(e)} · ${e.regionName} ✕`));
-    b.addEventListener('click', () => { state.cmp.splice(i, 1); applyView(); });
+    b.addEventListener('click', () => { state.cmp.splice(i, 1); saveCmp(); applyView(); });
     ca.append(b);
   });
 
