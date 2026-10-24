@@ -2,6 +2,7 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>아파트 실거래가</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
 --cds-font-size-title:1.75rem;--cds-font-size-heading:1.0625rem;--cds-font-size-body:.9375rem;--cds-font-size-caption:.8125rem;--cds-font-weight-medium:600;
@@ -62,6 +63,9 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-table th{position:sticky;top:0;background:var(--color-panel);text-align:right;font-weight:var(--cds-font-weight-medium);font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:.4rem .6rem;border-bottom:1px solid var(--color-border-line)}
 .gx-table td{text-align:right;padding:.4rem .6rem;border-bottom:1px solid var(--color-border-line)}
 .gx-table th:first-child,.gx-table td:first-child,.gx-table th:nth-child(2),.gx-table td:nth-child(2){text-align:left}
+.gx-xl{font:inherit;font-size:var(--cds-font-size-caption);margin-top:.6rem;padding:.4rem .9rem;border:1px solid var(--cds-border);border-radius:8px;background:var(--color-bg);color:var(--color-fg);cursor:pointer}
+.gx-xl:hover{border-color:var(--color-fg)}
+@media print{.gx-xl{display:none}}
 .gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
 .gx-empty{color:var(--color-fg-muted);padding:2rem 0;text-align:center}
 </style></head>
@@ -90,7 +94,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 
   <div id="cmp" hidden>
     <div class="gx-page">
-      <header class="gx-head"><h1>단지 비교</h1><p id="c-sub"></p></header>
+      <header class="gx-head"><h1>단지 비교</h1><p id="c-sub"></p>
+        <button type="button" class="gx-xl" id="xl-cmp">엑셀로 내보내기 (.xlsx)</button></header>
       <div class="gx-card gx-empty" id="c-empty">단지 상세 화면에서 <b>＋ 비교에 추가</b>를 눌러 단지를 담아 주세요.<br>시군구를 바꿔 다시 조회한 단지도 이어서 담을 수 있습니다. (최대 8개)</div>
       <div class="gx-page" id="c-body">
         <section class="gx-card"><h2>비교 단지</h2><div class="gx-chips" id="c-apts"></div></section>
@@ -132,6 +137,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <header class="gx-head" id="top">
         <h1 id="h-title"></h1>
         <p id="h-sub"></p>
+        <button type="button" class="gx-xl" id="xl-detail">엑셀로 내보내기 (.xlsx)</button>
       </header>
 
       <section id="tiles" aria-label="평형별 평균가"><div class="gx-tiles" id="tile-box"></div></section>
@@ -727,6 +733,103 @@ function renderCompare() {
     return tr;
   }));
 }
+
+/* ---------- 엑셀 내보내기 (SheetJS) ---------- */
+const xlSheet = (rows, widths) => {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = widths.map((w) => ({ wch: w }));
+  return ws;
+};
+const xlSave = (wb, name) => XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g, '_') + '.xlsx');
+const ppy = (t) => Math.round(t.price / (t.area / PY));   // 전용 평당가(만원)
+const avgInt = (a) => (a.length ? Math.round(d3.mean(a, (r) => r.price)) : undefined);
+
+function buildDetailWb() {
+  const { trades, sizes } = state;
+  const labels = sizes.map((s) => s.label);
+  const months = monthsInRange();
+  const years = [...new Set(months.map((m) => +m.slice(0, 4)))];
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(
+    [...trades].sort((a, b) => (a.date < b.date ? 1 : -1)).map((t) => ({
+      '계약일': t.date, '평형': t.size, '전용면적(㎡)': t.area, '층': t.floor, '거래금액(만원)': t.price,
+      '전용 평당가(만원)': ppy(t), '거래유형': t.gbn, '법정동': t.dong, '지번': t.jibun, '준공년도': t.built,
+    })), [12, 9, 12, 6, 14, 16, 10, 10, 10, 10]), '거래내역');
+
+  const summ = (size, year, v) => ({ '평형': size, '연도': year, '건수': v.length, '평균(만원)': avgInt(v), '최저(만원)': d3.min(v, (r) => r.price), '최고(만원)': d3.max(v, (r) => r.price) });
+  const ys = [];
+  for (const s of labels) for (const yr of years) { const v = trades.filter((t) => t.size === s && t.year === yr); if (v.length) ys.push(summ(s, yr, v)); }
+  for (const yr of years) { const v = trades.filter((t) => t.year === yr); if (v.length) ys.push(summ('전체', yr, v)); }
+  XLSX.utils.book_append_sheet(wb, xlSheet(ys, [9, 8, 8, 12, 12, 12]), '연도별 요약');
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
+    const row = { '계약월': m, '전체': avgInt(trades.filter((t) => t.ym === m)) };
+    for (const s of labels) row[s] = avgInt(trades.filter((t) => t.size === s && t.ym === m));
+    return row;
+  }), [10, 12, ...labels.map(() => 12)]), '월별 평균가(만원)');
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
+    const row = { '계약월': m, '전체': trades.filter((t) => t.ym === m).length };
+    for (const s of labels) row[s] = trades.filter((t) => t.size === s && t.ym === m).length;
+    return row;
+  }), [10, 8, ...labels.map(() => 8)]), '월별 건수');
+  return wb;
+}
+
+function buildCompareWb() {
+  const E = state.cmp, pick = state.cmpPick, metric = state.cmpMetric;
+  const val = (t) => (metric === 'price' ? t.price : ppy(t));
+  const mname = metric === 'price' ? '거래가(만원)' : '전용 평당가(만원)';
+  const rowsOf = (e) => (pick === ALL ? e.trades : e.trades.filter((t) => t.size === pick));
+  const name = (e) => `${e.apt} (${e.dong})`;
+  const from = E.map((e) => e.from).sort()[0], to = E.map((e) => e.to).sort().at(-1);
+  const months = monthsInRange(from, to);
+  const cut = months.length > 6 ? months[months.length - 6] : months[0];
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(E.map((e) => {
+    const r = rowsOf(e), v = r.map(val), recent = r.filter((t) => t.ym >= cut);
+    const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
+    return {
+      '단지': name(e), '지역': e.regionName, '평형': pick === ALL ? '전체' : pick, '지표': mname, '건수': r.length,
+      '평균': r.length ? Math.round(d3.mean(v)) : undefined, '최저': r.length ? Math.round(d3.min(v)) : undefined,
+      '최고': r.length ? Math.round(d3.max(v)) : undefined,
+      '최근 6개월 평균': recent.length ? Math.round(d3.mean(recent, val)) : undefined,
+      '최근 거래일': last ? last.date : undefined, '최근 거래금액(만원)': last ? last.price : undefined,
+    };
+  }), [30, 14, 8, 18, 8, 10, 10, 10, 16, 12, 18]), '단지별 요약');
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
+    const row = { '계약월': m };
+    for (const e of E) { const v = rowsOf(e).filter((t) => t.ym === m); row[name(e)] = v.length ? Math.round(d3.mean(v, val)) : undefined; }
+    return row;
+  }), [10, ...E.map(() => 24)]), `월별 평균 ${metric === 'price' ? '거래가' : '평당가'}`);
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(
+    E.flatMap((e) => e.trades.map((t) => ({ e, t }))).sort((a, b) => (a.t.date < b.t.date ? 1 : -1)).map(({ e, t }) => ({
+      '단지': name(e), '지역': e.regionName, '계약일': t.date, '평형': t.size, '전용면적(㎡)': t.area, '층': t.floor,
+      '거래금액(만원)': t.price, '전용 평당가(만원)': ppy(t), '거래유형': t.gbn,
+    })), [30, 14, 12, 9, 12, 6, 14, 16, 10]), '거래내역');
+  return wb;
+}
+
+const xlGuard = (fn) => () => {
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+    fn();
+  } catch (e) { $('status').className = 'err'; $('status').textContent = e.message; }
+};
+$('xl-detail').onclick = xlGuard(() => {
+  if (!state.trades.length) return;
+  xlSave(buildDetailWb(), `${state.apt}_실거래가_${state.from}-${state.to}`);
+});
+$('xl-cmp').onclick = xlGuard(() => {
+  if (!state.cmp.length) return;
+  renderCompare();   // 평형 기본값 등 화면 상태를 먼저 확정
+  const d = new Date();
+  xlSave(buildCompareWb(), `단지비교_${state.cmp.length}개_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`);
+});
 
 let rt;
 window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (state.view === 'cmp') renderCompare(); else if (state.trades.length) render(); }, 120); });
