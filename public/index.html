@@ -100,13 +100,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   </section>
 
   <div class="gx-chips" id="tabs" role="group" aria-label="보기 전환">
-    <button type="button" data-view="detail" aria-pressed="true">단지 상세</button>
-    <button type="button" data-view="cmp" aria-pressed="false">단지 비교 <span id="cmpN"></span></button>
+    <button type="button" data-view="detail" aria-pressed="true">실거래가</button>
+    <button type="button" data-view="cmp" aria-pressed="false">실거래가 단지 비교 <span id="cmpN"></span></button>
+    <button type="button" data-view="gongsi" aria-pressed="false">동·호별 공시가격</button>
   </div>
 
   <div id="cmp" hidden>
     <div class="gx-page">
-      <header class="gx-head"><h1>단지 비교</h1><p id="c-sub"></p>
+      <header class="gx-head"><h1>실거래가 단지 비교</h1><p id="c-sub"></p>
         <button type="button" class="gx-xl" id="xl-cmp">엑셀로 내보내기 (.xlsx)</button></header>
       <div class="gx-card gx-empty" id="c-empty">단지 상세 화면에서 <b>＋ 비교에 추가</b>를 눌러 단지를 담아 주세요.<br>시군구를 바꿔 다시 조회한 단지도 이어서 담을 수 있습니다. (최대 8개)</div>
       <div class="gx-page" id="c-body">
@@ -140,6 +141,32 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           </div>
         </section>
       </div>
+    </div>
+  </div>
+
+  <div id="gsview" hidden>
+    <div class="gx-page">
+      <header class="gx-head" id="gs-head"><h1 id="gs-title"></h1><p>동·호별 공시가격 · 국토교통부 공동주택가격(V-World) · 공시기준일은 매년 1월 1일</p></header>
+      <div class="gx-card gx-empty" id="gs-empty">위에서 시군구를 조회하고 아파트를 선택하면 동·호별 공시가격을 볼 수 있습니다.</div>
+        <section class="gx-card" id="gongsi">
+          <h2>동·호별 공시가격</h2>
+          <p class="gx-note">국토교통부 공동주택가격(V-World) 자료입니다. 공시기준일은 매년 1월 1일이고, 필지(지번) 단위로 조회하므로 한 필지에 단지가 여러 개면 함께 나옵니다.</p>
+          <div class="gx-row"><button type="button" class="gx-xl" id="gs-load" style="margin-top:0">공시가격 조회</button><span id="gs-status" class="gx-note"></span></div>
+          <div id="gs-body" hidden>
+            <div class="gx-ctrl"><div class="gx-row">
+              <label>기준연도<select id="gs-year"></select></label>
+              <label>동<select id="gs-dong"></select></label>
+              <label>평형<select id="gs-size"></select></label>
+              <label>호<select id="gs-ho"></select></label>
+              <button type="button" class="gx-xl" id="gs-xl" style="margin-top:0">엑셀로 내보내기 (.xlsx)</button>
+            </div></div>
+            <p class="gx-note" id="gs-kpi" style="margin-top:.6rem"></p>
+            <div class="gx-tablewrap">
+              <table class="gx-table" id="gs-tbl"><thead><tr></tr></thead><tbody></tbody></table>
+            </div>
+            <p class="gx-note" id="gs-more"></p>
+          </div>
+        </section>
     </div>
   </div>
 
@@ -209,25 +236,6 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         </div>
       </section>
 
-      <section class="gx-card" id="gongsi">
-        <h2>동·호별 공시가격</h2>
-        <p class="gx-note">국토교통부 공동주택가격(V-World) 자료입니다. 공시기준일은 매년 1월 1일이고, 필지(지번) 단위로 조회하므로 한 필지에 단지가 여러 개면 함께 나옵니다.</p>
-        <div class="gx-row"><button type="button" class="gx-xl" id="gs-load" style="margin-top:0">공시가격 조회</button><span id="gs-status" class="gx-note"></span></div>
-        <div id="gs-body" hidden>
-          <div class="gx-ctrl"><div class="gx-row">
-            <label>기준연도<select id="gs-year"></select></label>
-            <label>동<select id="gs-dong"></select></label>
-            <label>평형<select id="gs-size"></select></label>
-            <label>호<select id="gs-ho"></select></label>
-            <button type="button" class="gx-xl" id="gs-xl" style="margin-top:0">엑셀로 내보내기 (.xlsx)</button>
-          </div></div>
-          <p class="gx-note" id="gs-kpi" style="margin-top:.6rem"></p>
-          <div class="gx-tablewrap">
-            <table class="gx-table" id="gs-tbl"><thead><tr></tr></thead><tbody></tbody></table>
-          </div>
-          <p class="gx-note" id="gs-more"></p>
-        </div>
-      </section>
 
       <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 해제(취소) 거래는 제외했고, 평형은 전용면적을 기준으로 묶었습니다.</p>
     </div>
@@ -359,6 +367,7 @@ function selectApt() {
     chips.append(b);
   });
   applyView();
+  if (state.view === 'gongsi') ensureGongsi();
   render();
 }
 const ymLabel = (s) => `${s.slice(0, 4)}년 ${+s.slice(4)}월`;
@@ -598,11 +607,16 @@ state.cmpMetric = 'price';
 function applyView() {
   $('dash').hidden = state.view !== 'detail' || !state.trades.length;
   $('cmp').hidden = state.view !== 'cmp';
+  $('gsview').hidden = state.view !== 'gongsi';
   [...$('tabs').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === state.view)));
   $('cmpN').textContent = state.cmp.length ? `(${state.cmp.length})` : '';
   if (state.view === 'cmp') renderCompare();
+  if (state.view === 'gongsi') renderGongsiTab();
 }
-[...$('tabs').children].forEach((b) => b.addEventListener('click', () => { state.view = b.dataset.view; applyView(); }));
+[...$('tabs').children].forEach((b) => b.addEventListener('click', () => {
+  state.view = b.dataset.view; applyView();
+  if (state.view === 'gongsi') ensureGongsi();
+}));
 
 // 단지별 평형 기본값: 이미 담긴 단지들이 고른 평형을 이 단지도 갖고 있으면 그것, 없으면 이 단지에서 가장 많이 거래된 평형
 const defaultPick = (e, others) => {
@@ -898,7 +912,19 @@ function gongsiAddr() {
   return [reg.sido, reg.name === reg.sido ? '' : reg.name, t0.dong, t0.jibun].filter(Boolean).join(' ');
 }
 
-$('gs-load').onclick = async () => {
+// 공시가격 탭: 선택한 단지가 없으면 안내, 있으면 단지명을 보여준다
+function renderGongsiTab() {
+  const has = state.trades.length > 0;
+  $('gs-empty').hidden = has; $('gs-head').hidden = !has; $('gongsi').hidden = !has;
+  if (has) $('gs-title').textContent = state.apt;
+}
+// 탭을 열거나 단지를 바꿀 때, 아직 안 불러왔고 조회 중이 아니면 자동으로 불러온다 (결과는 서버가 캐시)
+function ensureGongsi() {
+  if (state.trades.length && !gs.info && !$('gs-load').disabled) loadGongsi();
+}
+$('gs-load').onclick = () => loadGongsi();
+
+async function loadGongsi() {
   const btn = $('gs-load'), st = $('gs-status'), tk = ++gs.token;
   btn.disabled = true; st.className = 'gx-note'; st.textContent = '필지를 찾는 중…';
   try {
@@ -909,7 +935,7 @@ $('gs-load').onclick = async () => {
     const ys = $('gs-year'); ys.replaceChildren(...info.years.map((y) => new Option(y + '년', y)));
     await loadGongsiYear(info.years[0], tk);
   } catch (e) { if (tk === gs.token) { st.className = 'gx-note err'; st.textContent = e.message; btn.disabled = false; } }
-};
+}
 
 async function loadGongsiYear(year, tk = gs.token) {
   const st = $('gs-status');
