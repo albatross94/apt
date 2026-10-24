@@ -74,6 +74,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-aptrow select{font:inherit;font-size:var(--cds-font-size-caption);color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem;max-width:100%}
 .gx-aptrow .rm{font:inherit;border:0;background:transparent;color:var(--color-fg-muted);cursor:pointer;padding:.2rem .4rem;border-radius:6px}
 .gx-aptrow .rm:hover{color:var(--color-bad)}
+.gx-note.err{color:var(--color-bad)}
+#gs-tbl th{cursor:pointer;user-select:none}
 .gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
 .gx-empty{color:var(--color-fg-muted);padding:2rem 0;text-align:center}
 </style></head>
@@ -205,6 +207,25 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         </div>
       </section>
 
+      <section class="gx-card" id="gongsi">
+        <h2>동·호별 공시가격</h2>
+        <p class="gx-note">국토교통부 공동주택가격(V-World) 자료입니다. 공시기준일은 매년 1월 1일이고, 필지(지번) 단위로 조회하므로 한 필지에 단지가 여러 개면 함께 나옵니다.</p>
+        <div class="gx-row"><button type="button" class="gx-xl" id="gs-load" style="margin-top:0">공시가격 조회</button><span id="gs-status" class="gx-note"></span></div>
+        <div id="gs-body" hidden>
+          <div class="gx-ctrl"><div class="gx-row">
+            <label>기준연도<select id="gs-year"></select></label>
+            <label>동<select id="gs-dong"></select></label>
+            <label>평형<select id="gs-size"></select></label>
+            <button type="button" class="gx-xl" id="gs-xl" style="margin-top:0">엑셀로 내보내기 (.xlsx)</button>
+          </div></div>
+          <p class="gx-note" id="gs-kpi" style="margin-top:.6rem"></p>
+          <div class="gx-tablewrap">
+            <table class="gx-table" id="gs-tbl"><thead><tr></tr></thead><tbody></tbody></table>
+          </div>
+          <p class="gx-note" id="gs-more"></p>
+        </div>
+      </section>
+
       <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 해제(취소) 거래는 제외했고, 평형은 전용면적을 기준으로 묶었습니다.</p>
     </div>
   </div>
@@ -258,7 +279,7 @@ $('go').onclick = async () => {
     const r = await fetch('/api/trades?' + new URLSearchParams({ lawd: sel.value, from, to }));
     const j = await r.json();
     if (!r.ok) throw new Error(j.error);
-    state.from = from; state.to = to;
+    state.from = from; state.to = to; state.lawd = sel.value;
     state.raw = j.trades.filter((t) => !t.canceled);
     st.textContent = `거래 ${state.raw.length.toLocaleString()}건 (해제 제외)`;
     buildAptOptions();
@@ -314,6 +335,7 @@ function selectApt() {
   $('addCmp').disabled = false;
   state.trades = prepTrades(state.raw, key);
   state.sizes = buildSizes(state.trades);
+  resetGongsi();
   state.pick = ALL;
   const t0 = state.trades[0];
   const reg = state.regions.find((r) => r.code === sel.value) || { sido: '', name: '' };
@@ -590,13 +612,13 @@ const defaultPick = (e, others) => {
 $('addCmp').onclick = () => {
   const st = $('status');
   if (!state.trades.length) return;
-  const reg = state.regions.find((r) => r.code === sel.value) || { name: '' };
+  const reg = state.regions.find((r) => r.code === state.lawd) || { name: '' };
   const t0 = state.trades[0];
-  const id = sel.value + '|' + aptKey(t0);
+  const id = state.lawd + '|' + aptKey(t0);
   st.className = '';
   if (state.cmp.some((e) => e.id === id)) { st.textContent = '이미 비교 목록에 있습니다.'; return; }
   if (state.cmp.length >= 8) { st.className = 'err'; st.textContent = '비교는 최대 8개 단지까지 가능합니다.'; return; }
-  const entry = { id, lawd: sel.value, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes };
+  const entry = { id, lawd: state.lawd, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes };
   entry.pick = defaultPick(entry, state.cmp);
   state.cmp.push(entry);
   saveCmp();
@@ -846,6 +868,130 @@ $('xl-cmp').onclick = xlGuard(() => {
   const d = new Date();
   xlSave(buildCompareWb(), `단지비교_${state.cmp.length}개_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`);
 });
+
+/* ---------- 동·호별 공시가격 (V-World, 서버 /api/gongsi) ---------- */
+const gs = { info: null, year: null, rows: [], names: [], sort: { col: 'd', dir: 1 }, token: 0 };
+const gsCache = new Map();
+const GS_COLS = [['d', '동'], ['h', '호'], ['f', '층'], ['a', '전용(㎡)'], ['size', '평형'], ['p', '공시가격(만원)'], ['ppy', '전용 평당가(만원)']];
+
+function resetGongsi() {
+  gs.token++; gs.info = null; gs.rows = []; gs.year = null;
+  $('gs-body').hidden = true;
+  $('gs-load').disabled = false; $('gs-load').textContent = '공시가격 조회';
+  $('gs-status').className = 'gx-note'; $('gs-status').textContent = '';
+}
+
+async function gsApi(path, params) {
+  const r = await fetch(path + '?' + new URLSearchParams(params));
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error);
+  return j;
+}
+
+// 선택한 단지의 주소: 시도 시군구 법정동 지번 (조회한 지역 기준)
+function gongsiAddr() {
+  const reg = state.regions.find((r) => r.code === state.lawd) || { sido: '', name: '' };
+  const t0 = state.trades[0];
+  if (!t0.jibun) throw new Error('이 단지는 실거래 자료에 지번 정보가 없어 필지를 찾을 수 없습니다.');
+  return [reg.sido, reg.name === reg.sido ? '' : reg.name, t0.dong, t0.jibun].filter(Boolean).join(' ');
+}
+
+$('gs-load').onclick = async () => {
+  const btn = $('gs-load'), st = $('gs-status'), tk = ++gs.token;
+  btn.disabled = true; st.className = 'gx-note'; st.textContent = '필지를 찾는 중…';
+  try {
+    const info = await gsApi('/api/gongsi/years', { addr: gongsiAddr() });
+    if (tk !== gs.token) return;
+    if (!info.years.length) throw new Error(`공시가격 자료가 없습니다 (필지 ${info.address}).`);
+    gs.info = info;
+    const ys = $('gs-year'); ys.replaceChildren(...info.years.map((y) => new Option(y + '년', y)));
+    await loadGongsiYear(info.years[0], tk);
+  } catch (e) { if (tk === gs.token) { st.className = 'gx-note err'; st.textContent = e.message; btn.disabled = false; } }
+};
+
+async function loadGongsiYear(year, tk = gs.token) {
+  const st = $('gs-status');
+  st.className = 'gx-note'; st.textContent = `${year}년 공시가격을 불러오는 중… (호수가 많으면 몇 초 걸립니다)`;
+  const key = gs.info.pnu + '|' + year;
+  let d = gsCache.get(key);
+  if (!d) { d = await gsApi('/api/gongsi/units', { pnu: gs.info.pnu, year }); gsCache.set(key, d); }
+  if (tk !== gs.token) return;
+  gs.year = year; gs.names = d.names;
+  gs.rows = d.rows.map(([dong, ho, floor, area, price, n]) => ({ d: dong, h: ho, f: floor, a: area, p: price, ppy: Math.round(price / (area / PY)), n }));
+  gs.rows.forEach((r) => { r.area = r.a; });
+  gs.sizes = buildSizes(gs.rows);   // 가까운 전용면적끼리 묶어 r.size 부여 (상세 화면과 같은 규칙)
+  $('gs-year').value = year;
+  $('gs-dong').value = ''; $('gs-size').value = '';
+  refreshGsFilters();
+  $('gs-body').hidden = false;
+  $('gs-load').textContent = '다시 조회'; $('gs-load').disabled = false;
+  const nm = d.names.join(', ');
+  st.textContent = `${gs.info.address}${nm ? ' · ' + nm : ''} · PNU ${gs.info.pnu}`;
+  renderGongsi();
+}
+$('gs-year').onchange = async () => { try { await loadGongsiYear(Number($('gs-year').value)); } catch (e) { $('gs-status').className = 'gx-note err'; $('gs-status').textContent = e.message; } };
+// 동·평형 드롭다운 연동: 한쪽을 고르면 다른 쪽에는 그 조건에 실제로 있는 항목만 보여준다
+function refreshGsFilters() {
+  const dong = $('gs-dong').value, size = $('gs-size').value;
+  const dongs = [...new Set(gs.rows.filter((r) => !size || r.size === size).map((r) => r.d))];
+  const sizes = gs.sizes.filter((c) => gs.rows.some((r) => r.size === c.label && (!dong || r.d === dong)));
+  $('gs-dong').replaceChildren(new Option('전체', ''), ...dongs.map((x) => new Option(x + '동', x)));
+  $('gs-size').replaceChildren(new Option('전체', ''), ...sizes.map((c) => new Option(`${c.label} (약 ${c.py}평)`, c.label)));
+  $('gs-dong').value = dong; $('gs-size').value = size;
+}
+$('gs-dong').onchange = $('gs-size').onchange = () => { refreshGsFilters(); renderGongsi(); };
+
+const gsFiltered = () => {
+  const dong = $('gs-dong').value, size = $('gs-size').value;
+  return gs.rows.filter((r) => (!dong || r.d === dong) && (!size || r.size === size));
+};
+
+function renderGongsi() {
+  const rows = gsFiltered(), s = gs.sort;
+  const num = (v) => { const n = parseInt(v, 10); return Number.isNaN(n) ? v : n; };
+  const key = (r) => (s.col === 'size' ? parseInt(r.size, 10) : s.col === 'd' || s.col === 'h' ? num(r[s.col]) : r[s.col]);
+  const sorted = [...rows].sort((a, b) => {
+    const x = key(a), y = key(b);
+    return (typeof x === 'string' || typeof y === 'string' ? String(x).localeCompare(String(y), 'ko') : x - y) * s.dir
+      || num(a.d) - num(b.d) || num(a.h) - num(b.h);
+  });
+  const ps = rows.map((r) => r.p);
+  $('gs-kpi').textContent = rows.length
+    ? `${gs.year}년 · ${rows.length.toLocaleString()}호 · 평균 ${eok(d3.mean(ps))}억 · 최저 ${eok(d3.min(ps))}억 · 최고 ${eok(d3.max(ps))}억`
+    : '조건에 맞는 호가 없습니다.';
+  const head = $('gs-tbl').querySelector('thead tr');
+  head.replaceChildren(...GS_COLS.map(([c, t]) => {
+    const th = document.createElement('th'); th.textContent = t + (s.col === c ? (s.dir > 0 ? ' ▲' : ' ▼') : ''); th.dataset.c = c;
+    th.addEventListener('click', () => { s.dir = s.col === c ? -s.dir : 1; s.col = c; renderGongsi(); });
+    return th;
+  }));
+  const LIMIT = 300;
+  $('gs-tbl').querySelector('tbody').replaceChildren(...sorted.slice(0, LIMIT).map((r) => {
+    const tr = document.createElement('tr');
+    [r.d, r.h, r.f, r.a, r.size, fmt(r.p), fmt(r.ppy)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    return tr;
+  }));
+  $('gs-more').textContent = rows.length > LIMIT ? `상위 ${LIMIT}행만 표시했습니다. 동·평형으로 좁히거나 엑셀로 내보내면 전체를 볼 수 있어요.` : '';
+}
+
+function buildGongsiWb() {
+  const rows = gsFiltered();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, xlSheet(rows.map((r) => ({
+    '기준연도': gs.year, '단지': gs.names[r.n] || '', '동': r.d, '호': r.h, '층': r.f, '전용면적(㎡)': r.a, '평형': r.size,
+    '공시가격(만원)': r.p, '전용 평당가(만원)': r.ppy,
+  })), [10, 24, 8, 8, 6, 12, 9, 14, 16]), '동·호별 공시가격');
+  const byDong = d3.rollups(rows, (v) => ({ n: v.length, avg: Math.round(d3.mean(v, (r) => r.p)), min: d3.min(v, (r) => r.p), max: d3.max(v, (r) => r.p) }), (r) => r.d);
+  XLSX.utils.book_append_sheet(wb, xlSheet(byDong.map(([d, o]) => ({ '동': d, '호수': o.n, '평균(만원)': o.avg, '최저(만원)': o.min, '최고(만원)': o.max })), [8, 8, 12, 12, 12]), '동별 요약');
+  return wb;
+}
+$('gs-xl').onclick = () => {
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+    if (!gs.rows.length) return;
+    xlSave(buildGongsiWb(), `${state.apt}_공시가격_${gs.year}`);
+  } catch (e) { $('gs-status').className = 'gx-note err'; $('gs-status').textContent = e.message; }
+};
 
 let rt;
 window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (state.view === 'cmp') renderCompare(); else if (state.trades.length) render(); }, 120); });
