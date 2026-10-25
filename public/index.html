@@ -198,6 +198,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <p class="gx-note" id="meta-scatter"></p>
       </section>
 
+      <section class="gx-card" id="sec-wolse" hidden>
+        <h2 id="h-wolse">보증금–월세 분포</h2>
+        <p class="gx-note" id="note-wolse"></p>
+        <div class="gx-legend" id="legend-wolse"></div>
+        <div class="gx-plot"><div class="gx-chart" id="chart-wolse"></div><div class="gx-tip"></div></div>
+        <p class="gx-note" id="meta-wolse"></p>
+      </section>
+
       <section class="gx-card" id="sec-ratio" hidden>
         <h2 id="h-ratio">전세가율 추이</h2>
         <p class="gx-note" id="note-ratio"></p>
@@ -503,6 +511,7 @@ function render() {
 
   scatterChart(sub, months, where);
   ratioChart(months);
+  wolseChart(sub, where);
 
   // 차트 1: 월별 평균 (평형별 선)
   const e1 = q('#chart-all');
@@ -696,6 +705,50 @@ function scatterChart(sub, months, where) {
   q('#meta-scatter').textContent = `표본 ${fmt(pts.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중위 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))}`
     + (recent.length ? ` · 최근 6개월 ${recent.length}건 중위 ${won(d3.median(recent, (p) => p.y))}` : '')
     + ` · 출처 국토교통부 실거래가 공개시스템(계약일 기준), 조회 ${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}`;
+}
+
+/* ---------- 월세: 보증금–월세 산점도 ---------- */
+// 보증금을 올리면 월세가 내려가는 관계를 계약 1건씩 보여준다. 점 = 실제 신고된 월세 계약 1건.
+function wolseChart(sub, where) {
+  const sec = $('sec-wolse'), el = q('#chart-wolse');
+  sec.hidden = state.kind !== 'wolse';
+  if (sec.hidden) return;
+  el.replaceChildren();
+  q('#h-wolse').textContent = '보증금–월세 분포 · ' + where;
+  const rows = sub.filter((t) => t.rent > 0);
+  // 보증금·월세·평형이 같은 계약(임대단지에 흔함)은 한 점으로 합치고 건수만큼 점을 키운다
+  const grp = d3.rollups(rows, (v) => ({ ...v[0], n: v.length, last: d3.max(v, (r) => r.date) }), (t) => t.size + '|' + t.price + '|' + t.rent).map((g) => g[1]);
+  const pts = grp.map((g) => ({ ...g, si: state.sizes.findIndex((z) => z.label === g.size) })).sort((a, b) => b.n - a.n);
+  if (!pts.length) { el.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; return; }
+  const W = Math.max(el.clientWidth, 280), H = 340, m = { t: 12, r: 16, b: 36, l: 52 };
+  const ext = (k) => { const e = d3.extent(pts, (p) => p[k]), pad = (e[1] - e[0]) * 0.06 || 100; return [Math.max(0, e[0] - pad), e[1] + pad]; };
+  const x = d3.scaleLinear(ext('price'), [m.l, W - m.r]).nice(), y = d3.scaleLinear(ext('rent'), [H - m.b, m.t]).nice();
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+  svg.append('g').selectAll('line').data(y.ticks(6)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+  axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(el.clientWidth < 520 ? 5 : 8).tickFormat((d) => eok(d) + '억').tickSizeOuter(0)));
+  axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickFormat((d) => fmt(d)).tickSize(0)).call((g) => g.select('.domain').remove()));
+  svg.append('text').attr('x', W - m.r).attr('y', H - 4).attr('text-anchor', 'end').text('보증금').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+  svg.append('text').attr('x', m.l + 4).attr('y', m.t + 10).text('월세(만원)').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+  svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (p) => x(p.price)).attr('cy', (p) => y(p.rent)).attr('r', (p) => 3.5 + 2.2 * Math.sqrt(p.n - 1))
+    .attr('opacity', 0.6).style('fill', (p) => col(p.si));
+  const dot = svg.append('circle').attr('r', 7).attr('fill', 'none').attr('stroke-width', 2).style('stroke', 'var(--color-fg)').style('display', 'none');
+  svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const [mx, my] = d3.pointer(ev);
+      let best = null, bd = Infinity;
+      for (const p of pts) { const d = (x(p.price) - mx) ** 2 + (y(p.rent) - my) ** 2; if (d < bd) { bd = d; best = p; } }
+      if (!best || bd > 26 ** 2) { dot.style('display', 'none'); hideTip(el); return; }
+      dot.style('display', null).attr('cx', x(best.price)).attr('cy', y(best.rent));
+      tip(el, [best.n > 1 ? `같은 조건 ${best.n}건 · 최근 ${best.last} · 전용 ${best.area}㎡` : `${best.date} · ${best.floor}층 · 전용 ${best.area}㎡`, `보증금 ${won(best.price)} · 월세 ${fmt(best.rent)}만원`], x(best.price), y(best.rent));
+    })
+    .on('pointerleave', () => { dot.style('display', 'none'); hideTip(el); });
+  const single = state.pick !== ALL;
+  legend(q('#legend-wolse'), state.sizes.filter((s) => !single || s.label === state.pick).map((s) => ({ name: '전용 ' + s.label, color: col(state.sizes.indexOf(s)) })));
+  q('#note-wolse').textContent = '점은 신고된 월세 계약입니다. 보증금·월세·평형이 같은 계약은 한 점으로 합쳤고, 건수가 많을수록 점이 커집니다. 같은 평형이라도 보증금이 클수록 월세가 낮아지는 경향이 있어, 보증금 수준이 비슷한 계약끼리 비교해야 합니다.';
+  const by = d3.rollups(rows, (v) => ({ n: v.length, dep: d3.median(v, (p) => p.price), rent: d3.median(v, (p) => p.rent) }), (p) => p.size)
+    .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+  q('#meta-wolse').textContent = `표본 ${fmt(rows.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 중위 ` + by.map(([s, o]) => `${s} 보증금 ${won(o.dep)}·월세 ${fmt(o.rent)}만원(${o.n}건)`).join(' / ')
+    + ' · 출처 국토교통부 실거래가 공개시스템(계약일 기준)';
 }
 
 /* ---------- 전세가율 추이 (같은 단지·같은 평형의 전세 중위 보증금 ÷ 매매 중위가) ---------- */
