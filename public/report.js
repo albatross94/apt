@@ -1,9 +1,10 @@
 // 분석리포트 양식(A4 2~3쪽)을 HTML 문자열로 만든다. 데이터 D는 index.html의 buildReportData()가 앱 상태에서 만든다.
 // 양식과 렌더링 코드는 '국토교통부_실거래가_기반_분석리포트_생성기'에서 가져왔고, PDF를 읽는 부분은 쓰지 않는다.
 (function () {
-var CFG = { name: '한산부동산', sub: '수원센트럴아이파크자이', tel: '031-234-1234', rep: '' };   // 머리 문구(설정으로 바꿈)
+var CFG = { name: '한산부동산', sub: '수원센트럴아이파크자이', tel: '031-234-1234', rep: '', addr: '', reg: '' };   // 머리 문구(설정으로 바꿈)
 var repLine = function () { return CFG.rep ? '대표 공인중개사 ' + CFG.rep : ''; };
 var co = function () { return [CFG.name, CFG.sub, repLine(), CFG.tel].filter(Boolean).join(' · '); };
+var offLine = function () { return [CFG.addr, CFG.reg ? '등록번호 ' + CFG.reg : ''].filter(Boolean).join(' · '); };
 var subLine = function () { return [CFG.sub, repLine()].filter(Boolean).join(' · '); };
 var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
 function fmt(v){var sign=v<0?'−':'';v=Math.abs(Math.round(v));var e=Math.floor(v/10000),m=v%10000;
@@ -13,7 +14,7 @@ function fmt(v){var sign=v<0?'−':'';v=Math.abs(Math.round(v));var e=Math.floor
 function h2(t){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:20px;background:#8e1b1c;display:block"></span><h2 style="margin:0;font-size:20px;line-height:28px;font-weight:700">'+esc(t)+'</h2></div>'}
 function lab(l,v){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:16px;line-height:26px;font-weight:700">'+esc(v)+'</span></div>'}
 function slim(D,n,N){return '<div style="background:#8e1b1c;color:#fff;padding:12px 40px;display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><span style="font-size:16px;line-height:26px;font-weight:800">'+esc(D.complex)+' · 전용 '+esc(D.sel.a)+'㎡ 실거래가 분석리포트</span></div><span style="font-size:13px;line-height:20px;font-weight:700">'+n+' / '+N+'</span></div>'}
-function foot(n,N){return '<div style="margin:0 40px;padding:10px 0 16px 0;border-top:1px solid #423f3d;display:flex;justify-content:space-between;font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><span>'+esc(co())+'</span><span>'+n+' / '+N+'</span></div>'}
+function foot(n,N){return '<div style="margin:0 40px;padding:10px 0 16px 0;border-top:1px solid #423f3d;display:flex;justify-content:space-between;font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><span style="display:flex;flex-direction:column"><span>'+esc(co())+'</span>'+(offLine()?'<span>'+esc(offLine())+'</span>':'')+'</span><span>'+n+' / '+N+'</span></div>'}
 var BODY='padding:16px 40px 0 40px;display:flex;flex-direction:column;gap:16px;flex:1 1 auto';
 var ORD=['','가장','두 번째로','세 번째로','네 번째로','다섯 번째로','여섯 번째로','일곱 번째로','여덟 번째로','아홉 번째로'];
 var FL=[['L','저층'],['M','중층'],['H','고층']];
@@ -212,7 +213,7 @@ function needP3(D){return !!(D.hoga||D.ref||D.type==='월세')}
 function build(D){var N=needP3(D)?3:2;var p=[page1(D,N),page2(D,N,N===2)];if(N===3)p.push(page3(D,N));return p}
 window.Report = {
   build: build,
-  setConfig: function (c) { ['name', 'sub', 'tel', 'rep'].forEach(function (k) { if (c && typeof c[k] === 'string') CFG[k] = c[k].trim(); }); },
-  getConfig: function () { return { name: CFG.name, sub: CFG.sub, tel: CFG.tel, rep: CFG.rep }; },
+  setConfig: function (c) { ['name', 'sub', 'tel', 'rep', 'addr', 'reg'].forEach(function (k) { if (c && typeof c[k] === 'string') CFG[k] = c[k].trim(); }); },
+  getConfig: function () { return { name: CFG.name, sub: CFG.sub, tel: CFG.tel, rep: CFG.rep, addr: CFG.addr, reg: CFG.reg }; },
 };
 })();
