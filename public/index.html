@@ -1036,7 +1036,14 @@ function drawCmp(body) {
 const TAB_NAME = { sale: '매매', jeonse: '전세', wolse: '월세', gongsi: '공시가격', cmp: '단지비교' };
 const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 const safeName = (s) => s.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '').slice(0, 30);
-const pdfFile = (name) => `${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymd(new Date())}`;
+const ymdhm = (d) => ymd(d) + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+// 파일명에 쓰는 선택 면적: 매매·전세·월세는 고른 전용면적, 공시가격은 고른 전용면적 필터(없으면 '전체면적'), 단지비교는 단지별로 고른 면적을 +로 이음
+const areaTag = () => {
+  if (state.tab === 'gongsi') return $('gs-size').value ? $('gs-size').value + '㎡' : '전체면적';
+  if (state.tab === 'cmp') return [...new Set(cmp.keys.map((k) => cmp.areas[k]).filter((a) => a != null))].sort(NUM).map((a) => a + '㎡').join('+') || '전체면적';
+  return state.pick != null ? state.pick + '㎡' : '전체면적';
+};
+const pdfFile = (name) => `${areaTag()}_${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymdhm(new Date())}`;
 const pdfDlg = $('pdf-dlg');
 let pdfLast = '', pdfTel = '';
 $('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
