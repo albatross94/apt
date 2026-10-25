@@ -454,7 +454,7 @@ function jeonseBody(body, rows) {
 }
 
 function wolseBody(body, rows) {
-  const k = card('월세', `전용 ${state.pick}㎡ 월세 ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 보증금과 월세가 나옵니다.`);
+  const k = card('월세', `전용 ${state.pick}㎡ · 월세 ${fmt(rows.length)}건`);
   body.append(k);   // 그래프 너비를 재려면 먼저 화면에 붙어 있어야 한다
   const nw = rows.filter((t) => t.gbn === '신규'), rn = rows.filter((t) => t.gbn === '갱신');
   k.append(statsRow(
@@ -462,12 +462,15 @@ function wolseBody(body, rows) {
     stat('신규 계약', `${nw.length}건`),
     stat('갱신 계약', `${rn.length}건`),
     stat('보증금 범위', rows.length ? `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}` : '-', '가장 낮은 ~ 가장 높은 보증금')));
-  k.append(mk('div', '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
-  contractLegend(k, rows);
-  bandLegend(k, rows, (v) => `중간값 보증금 ${won(med(v))} · 월세 ${fmtRent(d3.median(v, (t) => t.rent))}만원`, false);
+  // 그래프는 매매·전세처럼 별도 카드로 둔다 (너비를 재려면 먼저 화면에 붙어 있어야 한다)
+  const g = card('월세 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금과 월세가 나옵니다.`);
+  body.append(g);
+  g.append(mk('div', '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
+  contractLegend(g, rows);
+  bandLegend(g, rows, (v) => `중간값 보증금 ${won(med(v))} · 월세 ${fmtRent(d3.median(v, (t) => t.rent))}만원`, false);
   rows = inBand(rows);
-  rentPlot(k, rows);
-  k.append(mk('h3', '보증금 구간별 월세', 'gx-rsub'));
+  rentPlot(g, rows);
+  g.append(mk('h3', '보증금 구간별 월세', 'gx-rsub'));
   const bins = [['보증금 5천만원 미만', 0, 5000], ['5천만원 ~ 1억원 미만', 5000, 10000], ['1억원 ~ 2억원 미만', 10000, 20000], ['2억원 이상 (반전세)', 20000, Infinity]];
   const tbl = mkTable(['보증금 구간', '건수', '월세 중간값', '월세 범위'], bins.map(([name, lo, hi]) => {
     const v = rows.filter((t) => t.price >= lo && t.price < hi), cnt = mk('span', `${v.length}건`);
@@ -475,7 +478,7 @@ function wolseBody(body, rows) {
     return [name, cnt, v.length >= LOW ? fmtRent(d3.median(v, (t) => t.rent)) + '만원' : '-', v.length ? `${fmt(d3.min(v, (t) => t.rent))} ~ ${fmt(d3.max(v, (t) => t.rent))}만원` : '-'];
   }), [0]);
   tbl.querySelector('table').classList.add('num');
-  k.append(tbl);
+  g.append(tbl);
 }
 
 function legendDots(el, items) {
