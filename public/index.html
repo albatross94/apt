@@ -2,6 +2,10 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>아파트 실거래가 및 공시가격 조회</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="/report.js"></script>
 <style>
 :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
 --cds-font-size-title:1.75rem;--cds-font-size-heading:1.0625rem;--cds-font-size-body:.9375rem;--cds-font-size-caption:.8125rem;--cds-font-weight-medium:600;
@@ -92,6 +96,13 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #gs-tbl th{cursor:pointer;user-select:none}
 .gx-table.num th,.gx-table.num td{text-align:right}
 .gx-table.num th:first-child,.gx-table.num td:first-child{text-align:left}
+/* 분석리포트 양식(A4 794x1123px). 화면 밖에 만들어 두고 이미지로 찍어 PDF에 넣는다 */
+.rpt-stage{position:absolute;left:-10000px;top:0;width:794px}
+.pg{width:794px;height:1123px;background:#e6d9ce;color:#202227;font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;line-height:normal}
+.pg,.pg *{box-sizing:border-box}
+@media print{.rpt-stage{display:none}}
+#pdf-dlg fieldset{border:1px solid var(--color-border-line);border-radius:8px;padding:.6rem .7rem;display:flex;flex-direction:column;gap:.35rem;margin:0}
+#pdf-dlg legend{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:0 .3rem}
 .gx-login{min-height:70vh;display:flex;align-items:center;justify-content:center}
 .gx-login form{width:min(22rem,100%);gap:var(--cds-gap-sm)}
 .gx-login input{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.5rem .7rem}
@@ -229,9 +240,18 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <input id="pdf-name" type="text" maxlength="30" autocomplete="off" placeholder="예: 홍길동">
     <label class="gx-note" for="pdf-tel">고객 연락처 (선택)</label>
     <input id="pdf-tel" type="tel" maxlength="30" autocomplete="off" placeholder="예: 010-1234-5678">
+    <fieldset id="pdf-co">
+      <legend>리포트 머리 문구 (고객에게 보이는 회사 정보)</legend>
+      <label class="gx-note" for="pdf-co-name">회사명</label>
+      <input id="pdf-co-name" type="text" maxlength="30" autocomplete="off">
+      <label class="gx-note" for="pdf-co-sub">부제 (단지명·지점 등)</label>
+      <input id="pdf-co-sub" type="text" maxlength="40" autocomplete="off">
+      <label class="gx-note" for="pdf-co-tel">전화번호</label>
+      <input id="pdf-co-tel" type="tel" maxlength="30" autocomplete="off">
+    </fieldset>
     <p class="gx-note" id="pdf-file"></p>
-    <p class="gx-note">확인을 누르면 인쇄 창이 열립니다. 대상(프린터)을 <b>PDF로 저장</b>으로 고르세요.</p>
-    <div class="gx-row"><button type="button" class="sec" id="pdf-cancel">취소</button><button type="submit">확인</button></div>
+    <p class="gx-note" id="pdf-how"></p>
+    <div class="gx-row"><button type="button" class="sec" id="pdf-cancel">취소</button><button type="submit" id="pdf-ok">확인</button></div>
   </form>
 </dialog>
 
@@ -477,7 +497,7 @@ async function selectApt() {
   state.pick = d3.greatest(d3.rollups(base, (v) => v.length, (t) => t.area), (d) => d[1])[0];
   const t0 = all[0], dong = d3.greatest(d3.rollups(all, (v) => v.length, (t) => t.dong), (d) => d[1])[0];
   const built = (all.find((t) => t.built) || {}).built;
-  state.apt = t0.apt;
+  state.apt = t0.apt; state.dong = dong; state.built = built;
   $('h-title').textContent = t0.apt;
   $('h-sub').textContent = `${regionLabel()} ${dong}${built ? ' · ' + built + '년 준공' : ''} · 조회기간: ${periodLabel()}`;
   $('dash').hidden = false;
@@ -1064,21 +1084,172 @@ const aptTag = () => {
 const pdfFile = (name, tel = '') => [aptTag(), areaTag(), TAB_NAME[state.tab], safeName(name) || '고객', safeName(tel), ymdhm(new Date())].filter(Boolean).join('_');
 const pdfDlg = $('pdf-dlg');
 let pdfLast = '', pdfTel = '';
-$('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
+// 매매·전세·월세 탭은 분석리포트 양식(이미지 PDF), 공시가격·단지비교 탭은 브라우저 인쇄로 저장한다
+const isReportTab = () => KINDS[state.tab] != null;
+const CO_KEY = 'aptReportCo', CO_DEFAULT = { name: '한산부동산', sub: '수원센트럴아이파크자이', tel: '031-234-1234' };
+const loadCo = () => { try { return { ...CO_DEFAULT, ...JSON.parse(localStorage.getItem(CO_KEY) || '{}') }; } catch { return { ...CO_DEFAULT }; } };
+$('pdf-btn').onclick = () => {
+  $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = '';
+  const rep = isReportTab(), co = loadCo();
+  $('pdf-co').hidden = !rep;
+  $('pdf-co-name').value = co.name; $('pdf-co-sub').value = co.sub; $('pdf-co-tel').value = co.tel;
+  $('pdf-how').textContent = rep ? '확인을 누르면 분석리포트(A4 3쪽) PDF가 바로 저장됩니다.' : '확인을 누르면 인쇄 창이 열립니다. 대상(프린터)을 PDF로 저장으로 고르세요.';
+  $('pdf-ok').disabled = false;
+  pdfDlg.showModal(); $('pdf-name').focus();
+};
 $('pdf-cancel').onclick = () => pdfDlg.close();
 $('pdf-name').oninput = $('pdf-tel').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value, $('pdf-tel').value) + '.pdf' : ''; };
-$('pdf-form').onsubmit = (e) => {
+$('pdf-form').onsubmit = async (e) => {
   e.preventDefault();
   const name = $('pdf-name').value.trim();
   if (!safeName(name)) { $('pdf-file').textContent = '고객 성함을 입력해 주세요.'; $('pdf-name').focus(); return; }
   const tel = $('pdf-tel').value.trim();
-  pdfLast = name; pdfTel = tel; pdfDlg.close();
+  pdfLast = name; pdfTel = tel;
+  if (isReportTab()) {
+    const ok = $('pdf-ok'), st = $('pdf-file');
+    ok.disabled = true; st.textContent = '리포트를 만드는 중… (몇 초 걸립니다)';
+    try { await saveReportPdf(name, tel); pdfDlg.close(); }
+    catch (ex) { st.textContent = ex.message || '리포트를 만들지 못했습니다.'; ok.disabled = false; }
+    return;
+  }
+  pdfDlg.close();
   const old = document.title, now = new Date();
   $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 저장일시 ${dtstr(now)}`;
   document.title = pdfFile(name, tel);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
   addEventListener('afterprint', () => { document.title = old; }, { once: true });
   setTimeout(() => print(), 100);
 };
+
+/* ---------- 분석리포트(A4) PDF: 앱 상태로 데이터를 만들고 public/report.js의 양식에 넣는다 ---------- */
+async function saveReportPdf(name, tel) {
+  if (!window.html2canvas || !window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
+  const co = { name: $('pdf-co-name').value.trim(), sub: $('pdf-co-sub').value.trim(), tel: $('pdf-co-tel').value.trim() };
+  try { localStorage.setItem(CO_KEY, JSON.stringify(co)); } catch {}
+  Report.setConfig(co);
+  const D = buildReportData();
+  const stage = mk('div', null, 'rpt-stage');
+  stage.innerHTML = Report.build(D).join('');
+  document.body.append(stage);
+  try {
+    try { await document.fonts.load('700 16px "Noto Sans KR"', '한글'); } catch {}
+    await document.fonts.ready;
+    const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const pgs = stage.querySelectorAll('.pg');
+    for (let i = 0; i < pgs.length; i++) {
+      const cv = await html2canvas(pgs[i], { scale: 2.5, backgroundColor: '#e6d9ce', width: 794, height: 1123, windowWidth: 900, useCORS: true });
+      if (i) doc.addPage('a4', 'portrait');
+      doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+    }
+    const a = mk('a'), url = URL.createObjectURL(doc.output('blob'));
+    a.href = url; a.download = pdfFile(name, tel) + '.pdf'; document.body.append(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  } finally { stage.remove(); }
+}
+
+// 눈금 간격: 후보 중 칸 수가 maxN 이하가 되는 가장 작은 간격
+const niceStep = (span, cands, maxN) => cands.find((s) => span / s <= maxN) || cands.at(-1);
+const p2 = (n) => String(n).padStart(2, '0');
+
+function buildReportData() {
+  const tab = state.tab, KN = KNAME[tab], pick = state.pick, D0 = state.data, I = state.loadInfo;
+  const all = [...D0.sale, ...D0.jeonse, ...D0.wolse];
+  const rows = D0[tab].filter((t) => t.area === pick);
+  if (!rows.length) throw new Error(`전용 ${pick}㎡의 ${KN} 거래가 없어 리포트를 만들 수 없습니다. 다른 면적을 골라 주세요.`);
+  const now = new Date(), latestIso = d3.max(all, (t) => t.date) || '';
+  const mlist = monthsInRange(), first = Date.UTC(+mlist[0].slice(0, 4), +mlist[0].slice(5) - 1, 1);
+  const nextM = d3.utcFormat('%Y-%m')(d3.utcMonth.offset(new Date(mlist.at(-1) + '-01T00:00:00Z'), 1));
+  const labels = [...mlist, nextM];
+  const starts = labels.map((m) => Math.round((Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 1) - first) / 864e5));
+  const dayOf = (s) => Math.round((Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) - first) / 864e5);
+  const kOf = (t) => 'LMH'[FLOOR_BANDS.indexOf(bandOf(t))];
+  const nw = rows.filter((t) => t.gbn === '신규'), rn = rows.filter((t) => t.gbn === '갱신');
+  const D = {
+    type: KN, complex: state.apt, addr: `${regionLabel()} ${state.dong}`, built: state.built ? String(state.built) : '',
+    period: `${state.from.slice(0, 4)}.${state.from.slice(4)} ~ ${state.to.slice(0, 4)}.${state.to.slice(4)}`,
+    saved: `${now.getFullYear()}.${p2(now.getMonth() + 1)}.${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
+    cust: null,   // 고객명·연락처는 PDF 안에 넣지 않고 파일명에만 쓴다
+    areas: state.areas.map((a) => ({ a: String(a), py: pyeong(a), n: D0[tab].filter((t) => t.area === a).length })),
+    sel: { a: String(pick), n: rows.length, py: pyeong(pick) },
+    latest: latestIso.replaceAll('-', '.'),
+    src: '국토교통부 실거래가 공개시스템 (아파트 매매, 아파트 전월세)',
+    cond: `계약일 ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · ${regionLabel()} · 단지명 ${state.apt} · 전용 ${pick}㎡`,
+    basis: `${dtstr(I.at)} 수집 · 계약일 기준 · 이 단지의 가장 최근 계약일 ${latestIso || '—'}`,
+    proc: '원본 거래 건을 그대로 사용했고, 해제된 매매 거래만 통계에서 뺐습니다. 전월세 자료에는 해제 거래가 없습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.',
+    months: labels.map((m) => m.slice(2, 4) + '.' + m.slice(5)), starts, daysLast: starts.at(-1),
+    dots: [], meds: [], hoga: null, ref: null, unsupported: false,
+  };
+  // 층 구간별 건수·중간값
+  D.floors = {};
+  FLOOR_BANDS.forEach((b, i) => {
+    const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null };
+    if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); } else f.med = med(v); }
+    D.floors['LMH'[i]] = f;
+  });
+  // 요약 수치
+  if (tab === 'sale') {
+    const latest = d3.max(rows, (t) => t.date), cut = d3.utcFormat('%Y-%m-%d')(d3.utcMonth.offset(new Date(latest + 'T00:00:00Z'), -3));
+    const rec = rows.filter((t) => t.date > cut);
+    D.kpi = { n: rows.length, med: med(rows), min: d3.min(rows, (t) => t.price), max: d3.max(rows, (t) => t.price), recent: rec.length ? { med: med(rec), n: rec.length, from: mmdd(cut), to: mmdd(latest) } : null };
+  } else if (tab === 'jeonse') {
+    const sale = D0.sale.filter((t) => t.area === pick);
+    const ratio = (a) => (a.length && sale.length ? (med(a) / med(sale) * 100).toFixed(1) + '%' : null), r = ratio(rows);
+    D.kpi = { n: rows.length, med: med(rows), min: d3.min(rows, (t) => t.price), max: d3.max(rows, (t) => t.price),
+      newMed: nw.length >= LOW ? med(nw) : null, newN: nw.length, renewMed: rn.length >= LOW ? med(rn) : null, renewN: rn.length,
+      ratioRaw: r ? `${r} 전세 ${won(med(rows))} ÷ 매매 ${won(med(sale))}${ratio(nw) ? ' · 신규 계약만 ' + ratio(nw) : ''}` : '' };
+  } else {
+    D.kpi = { n: rows.length, newN: nw.length, renewN: rn.length, depRange: `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}`, allDep: med(rows), allRent: d3.median(rows, (t) => t.rent) };
+  }
+  if (tab !== 'sale') { D.legNew = nw.length; D.legRenew = rn.length; }
+  // 그래프
+  if (tab === 'wolse') {
+    const maxP = d3.max(rows, (t) => t.price), maxR = d3.max(rows, (t) => t.rent);
+    const sx = niceStep(maxP, [1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000], 6), sy = niceStep(maxR, [5, 10, 20, 25, 50, 100, 200, 500, 1000], 5);
+    D.xt = d3.range(0, Math.ceil(maxP / sx) * sx + 1, sx); D.yt = d3.range(0, Math.ceil(maxR / sy) * sy + 1, sy).reverse();
+    D.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, x: t.price, y: t.rent }));
+    D.warn = '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.';
+    const bins = [['보증금 5천만원 미만', 0, 5000], ['5천만원 ~ 1억원 미만', 5000, 10000], ['1억원 ~ 2억원 미만', 10000, 20000], ['2억원 이상 (반전세)', 20000, Infinity]];
+    D.tiers = bins.map(([lab, lo, hi]) => {
+      const v = rows.filter((t) => t.price >= lo && t.price < hi);
+      return { lab, n: `${v.length}건`, med: v.length >= LOW ? fmtRent(d3.median(v, (t) => t.rent)) + '만원' : '-', rng: v.length ? `${fmt(d3.min(v, (t) => t.rent))} ~ ${fmt(d3.max(v, (t) => t.rent))}만원` : '-' };
+    });
+  } else {
+    const ys = d3.extent(rows, (t) => t.price / 10000), st = niceStep(ys[1] - ys[0] || 0.1, [0.1, 0.2, 0.5, 1, 2, 5, 10, 20], 6);
+    const lo = Math.floor(ys[0] / st + 1e-9) * st, hi = Math.max(Math.ceil(ys[1] / st - 1e-9) * st, lo + st);
+    D.ticks = d3.range(Math.round(lo / st), Math.round(hi / st) + 1).map((i) => +(i * st).toFixed(2)).reverse();
+    D.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, d: dayOf(t.date), p: t.price / 10000 }));
+    // 월별 중간값: 한 달 3건 이상인 달만
+    for (const [ym, v] of d3.group(rows, (t) => t.ym)) {
+      const mi = mlist.indexOf(ym);
+      if (v.length >= 3 && mi >= 0) D.meds.push({ mi, d: starts[mi] + 15, p: med(v) / 10000 });
+    }
+    D.meds.sort((a, b) => a.d - b.d);
+  }
+  // 현재 호가와 실거래 비교 (askCard와 같은 기준) — 호가를 입력했으면 hoga, 아니면 최근 6개월 실거래 기준(ref)
+  const A = { price: '', rent: '', floor: '', src: '', date: '', ...state.ask[tab] }, wolse = tab === 'wolse', PN = tab === 'sale' ? '거래가' : '보증금';
+  const cutM = mlist.length > 6 ? mlist[mlist.length - 6] : mlist[0], rec6 = rows.filter((t) => t.ym >= cutM), recOk = rec6.length >= LOW, use = recOk ? rec6 : rows;
+  const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price), rm = wolse ? d3.median(use, (t) => t.rent) : null;
+  const basis = `같은 단지 · 전용 ${pick}㎡ · ${recOk ? `최근 6개월(${cutM.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec6.length}건뿐)`} ${KN} 거래 ${use.length}건`;
+  const price = parseFloat(A.price), rent = parseFloat(A.rent), floor = parseInt(A.floor, 10), sgn = (v) => (v >= 0 ? '+' : '−');
+  if (!(price > 0)) {
+    D.ref = { basis, med: won(mdn), rent: wolse ? fmtRent(rm) + '만원' : '', range: `${won(lo)} ~ ${won(hi)}` };
+  } else {
+    const diff = price - mdn, hasFloor = floor > 0;
+    const sim = [...use].sort((x, y) => (hasFloor ? Math.abs(x.floor - floor) - Math.abs(y.floor - floor) : 0) || (x.date < y.date ? 1 : -1)).slice(0, 8);
+    D.hoga = {
+      basis, med: won(mdn), range: `${won(lo)} ~ ${won(hi)}`, input: won(price) + (hasFloor ? ` · ${floor}층` : ''), inMoney: won(price), medMoney: won(mdn),
+      dsign: diff === 0 ? '' : sgn(diff), dval: diff === 0 ? '0원' : won(Math.abs(diff)), pct: `${sgn(diff)}${(Math.abs(diff / mdn) * 100).toFixed(2)}%`, below: diff < 0,
+      pos: `비교 거래 ${use.length}건 중 ${use.filter((t) => t.price < price).length}건보다 높고 ${use.filter((t) => t.price > price).length}건보다 낮음`,
+      srcdate: `${A.src.trim() || '출처 미입력'} · ${A.date || '기준일 미입력'}`, hasFloor,
+      rentMed: wolse ? fmtRent(rm) + '만원' : '',
+      rentLine: wolse && A.rent !== '' && rent >= 0 ? `${sgn(rent - rm)}${fmtRent(Math.abs(rent - rm))}만원 (호가 ${fmt(rent)}만원 / 중간값 ${fmtRent(rm)}만원)` : '',
+      head: ['계약일', '층', ...(hasFloor ? ['층 차이'] : []), `${PN}(만원)`, ...(wolse ? ['월세(만원)'] : []), '호가 대비(만원)'],
+      rows: sim.map((t) => [t.date, String(t.floor), ...(hasFloor ? [`${t.floor - floor >= 0 ? '+' : ''}${t.floor - floor}`] : []), fmt(t.price), ...(wolse ? [fmt(t.rent)] : []), `${sgn(price - t.price)}${fmt(Math.abs(price - t.price))}`]),
+    };
+  }
+  // 앱 화면의 '8억 원'은 리포트 양식에서 '8억원'으로 쓴다
+  const norm = (v) => (typeof v === 'string' ? v.replace(/억 원/g, '억원') : Array.isArray(v) ? v.map(norm) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, norm(x)])) : v);
+  return norm(D);
+}
 
 /* ---------- 근거 ---------- */
 function infoRender() {
