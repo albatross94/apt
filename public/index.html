@@ -1247,7 +1247,7 @@ async function restoreCmp() {
       if (!trades.length) throw new Error('거래 없음');
       const entry = { ...m, id: m.id.startsWith(kind + '|') ? m.id : kind + '|' + m.id, kind, trades, sizes: buildSizes(trades) };
       // 저장된 평형이 없거나 데이터 갱신으로 사라졌으면 기본값
-      if (entry.pick !== ALL && !entry.sizes.some((s) => s.label === entry.pick)) entry.pick = defaultPick(entry, state.cmp);
+      if (!entry.sizes.some((s) => s.label === entry.pick)) entry.pick = defaultPick(entry, state.cmp);
       state.cmp.push(entry);
     } catch { failed.push(m.apt); }
   }
@@ -1276,7 +1276,7 @@ function renderCompare() {
   const mname = metric === 'price' ? pname : '전용 평당가';
 
   // 단지별로 고른 평형이 유효한지 확인 (없으면 기본값)
-  for (const e of E) if (e.pick !== ALL && !e.sizes.some((s) => s.label === e.pick)) e.pick = defaultPick(e, E.filter((o) => o !== e));
+  for (const e of E) if (!e.sizes.some((s) => s.label === e.pick)) e.pick = defaultPick(e, E.filter((o) => o !== e));
   const rowsOf = (e) => (e.pick === ALL ? e.trades : e.trades.filter((t) => t.size === e.pick));
   const name = (e) => `${e.apt} (${e.dong})` + (e.kind && e.kind !== 'sale' ? ` [${kindOf(e.kind).name}]` : '');
   const pickName =(e) => (e.pick === ALL ? '전체' : e.pick);
@@ -1296,7 +1296,6 @@ function renderCompare() {
     const sm = document.createElement('small'); sm.textContent = e.regionName; nm.append(sm);
     const cnt = d3.rollup(e.trades, (v) => v.length, (t) => t.size);
     const s = document.createElement('select'); s.setAttribute('aria-label', name(e) + ' 평형');
-    s.append(new Option(`전체 평형 · ${e.trades.length}건`, ALL));
     for (const z of e.sizes) s.append(new Option(`${z.label} (약 ${z.py}평) · ${cnt.get(z.label) || 0}건`, z.label));
     s.value = e.pick;
     s.addEventListener('change', () => { e.pick = s.value; saveCmp(); renderCompare(); });
