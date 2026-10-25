@@ -110,8 +110,20 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 /* 인쇄(PDF)는 항상 밝은 색으로. 조회 조건·탭·버튼은 빼고, 선택 상자는 어떤 값을 골랐는지 보이도록 남긴다 */
 /* 브라우저가 붙이는 머리글·바닥글(날짜, 파일명)은 @page 여백을 0으로 두면 나오지 않는다.
    대신 쪽마다 위아래 여백이 있도록, 반복되는 머리·바닥 표 그룹(.pf-h/.pf-f)에 빈 칸을 둔다 */
-@page{margin:0}
+@page{margin:0;size:A4 portrait}
 @media print{
+  /* 쪽 배치: 카드·그래프·표 한 줄은 쪽 경계에서 잘리지 않게 하고, 제목은 다음 내용과 붙여 둔다 */
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}   /* 색 점·범례 색·카드 배경이 PDF에 나오도록 */
+  .gx-page,.gx-col{gap:.7rem}
+  .gx-card{break-inside:avoid;padding:.8rem 1rem;box-shadow:none}
+  #gs-card{break-inside:auto}   /* 공시가격 표는 길어서 쪽을 넘겨 이어 나오게 한다 */
+  .gx-plot,.gx-stats,.gx-legend,.gx-areas,.gx-kv,.gx-warnbox,.gx-chips{break-inside:avoid}
+  h1,h2,h3,.gx-rsub{break-after:avoid}
+  .gx-table thead{display:table-header-group}   /* 표가 쪽을 넘어가면 머리글 반복 */
+  .gx-table tr{break-inside:avoid}
+  .gx-stat .v{font-size:1.3rem}
+  .gx-head h1{font-size:1.6rem}
+  .gx-chart{min-height:0}
   .wrap{padding:0 14mm}
   .pf{display:table;width:100%}
   .pf-h{display:table-header-group}.pf-b{display:table-row-group}.pf-f{display:table-footer-group}
@@ -742,6 +754,7 @@ function askCard(body, rows, tab) {
   k.append(ctrl, out); body.append(k);
 
   function upd() {
+    k.classList.toggle('no-print', !(parseFloat(A.price) > 0));   // 호가를 입력하지 않았으면 PDF에 넣지 않는다
     const months = monthsInRange(), cut = months.length > 6 ? months[months.length - 6] : months[0];
     const rec = rows.filter((t) => t.ym >= cut), recOk = rec.length >= LOW, use = recOk ? rec : rows;
     const basis = recOk ? `최근 6개월(${cut.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec.length}건뿐)`;
@@ -1043,7 +1056,12 @@ const areaTag = () => {
   if (state.tab === 'cmp') return [...new Set(cmp.keys.map((k) => cmp.areas[k]).filter((a) => a != null))].sort(NUM).map((a) => a + '㎡').join('+') || '전체면적';
   return state.pick != null ? state.pick + '㎡' : '전체면적';
 };
-const pdfFile = (name) => `${areaTag()}_${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymdhm(new Date())}`;
+// 파일명에 쓰는 단지명: 단지비교는 고른 단지를 +로 잇는다(너무 길면 자른다)
+const aptTag = () => {
+  const names = state.tab === 'cmp' ? cmp.keys.map((k) => k.split('|')[1]) : [state.apt];
+  return names.filter(Boolean).join('+').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '').slice(0, 60) || '단지';
+};
+const pdfFile = (name) => `${aptTag()}_${areaTag()}_${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymdhm(new Date())}`;
 const pdfDlg = $('pdf-dlg');
 let pdfLast = '', pdfTel = '';
 $('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
