@@ -117,8 +117,6 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 <body><div class="wrap">
 <div class="gx-page">
 
-  <header class="gx-head"><h1 class="gx-title">아파트 실거래가 및 공시가격 조회</h1></header>
-
   <section class="gx-card gx-ctrl no-print" aria-label="조회 조건">
     <div class="gx-row">
       <label>시군구<select id="region"></select></label>
@@ -408,7 +406,7 @@ async function selectApt() {
   const t0 = all[0], dong = d3.greatest(d3.rollups(all, (v) => v.length, (t) => t.dong), (d) => d[1])[0];
   const built = (all.find((t) => t.built) || {}).built;
   state.apt = t0.apt;
-  $('h-title').textContent = t0.apt + ' 실거래가';
+  $('h-title').textContent = t0.apt;
   $('h-sub').textContent = `${regionLabel()} ${dong}${built ? ' · ' + built + '년 준공' : ''} · 매매 ${periodLabel()} 계약분 · 전월세 ${periodLabel()} 계약분`;
   $('dash').hidden = false;
   render();
