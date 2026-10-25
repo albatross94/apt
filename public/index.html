@@ -92,6 +92,11 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #gs-tbl th{cursor:pointer;user-select:none}
 .gx-table.num th,.gx-table.num td{text-align:right}
 .gx-table.num th:first-child,.gx-table.num td:first-child{text-align:left}
+.gx-login{min-height:70vh;display:flex;align-items:center;justify-content:center}
+.gx-login form{width:min(22rem,100%);gap:var(--cds-gap-sm)}
+.gx-login input{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.5rem .7rem}
+.gx-login button{font:inherit;padding:.55rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
+.gx-login button:disabled{opacity:.5;cursor:wait}
 .gx-pdf{font:inherit;align-self:flex-start;padding:.55rem 1.2rem;border-radius:9px;border:1px solid var(--color-fg);background:transparent;color:var(--color-fg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 .gx-printonly{display:none;margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
 #pdf-dlg{border:1px solid var(--cds-border);border-radius:var(--cds-radius);background:var(--color-bg);color:var(--color-fg);padding:var(--cds-pad-lg);max-width:min(24rem,calc(100vw - 2rem));font-family:var(--font-sans)}
@@ -115,7 +120,16 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-eyebrow{margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium)}
 </style></head>
 <body><div class="wrap">
-<div class="gx-page">
+<div id="login" class="gx-login" hidden>
+  <form id="login-form" class="gx-card">
+    <h2>로그인</h2>
+    <label class="gx-note" for="login-pw">비밀번호</label>
+    <input id="login-pw" type="password" autocomplete="current-password" required>
+    <p id="login-err" class="gx-note err" role="alert"></p>
+    <button type="submit" id="login-go">로그인</button>
+  </form>
+</div>
+<div class="gx-page" id="app" hidden>
 
   <section class="gx-card gx-ctrl no-print" aria-label="조회 조건">
     <div class="gx-row">
@@ -126,6 +140,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <label>시작월<select id="from"></select></label>
       <label>종료월<select id="to"></select></label>
       <button id="go">조회</button><span id="status"></span>
+      <button type="button" class="sec" id="logout" hidden style="margin-left:auto">로그아웃</button>
     </div>
     <div class="gx-row">
       <label>아파트명<select id="apt" disabled style="min-width:20rem"><option>조회 후 선택</option></select></label>
@@ -198,6 +213,40 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 </dialog>
 
 <script>
+/* ---------- 로그인 (공용 비밀번호, 서버가 세션 쿠키 발급) ---------- */
+// 로그인이 필요 없는 설정(APP_PASSWORD 없음)이면 바로 앱을 보여 준다. 첫 화면에서는 확인이 끝나기 전까지 아무것도 보이지 않는다.
+const showApp = (authed, required) => {
+  document.getElementById('login').hidden = authed;
+  document.getElementById('app').hidden = !authed;
+  document.getElementById('logout').hidden = !(authed && required);
+  if (!authed) document.getElementById('login-pw').focus();
+};
+// 세션이 끝난 뒤 데이터 요청이 401로 오면 로그인 화면으로 돌아간다
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (...a) => {
+  const r = await rawFetch(...a);
+  if (r.status === 401 && String(a[0]).startsWith('/api/') && !/^\/api\/(login|me)/.test(String(a[0]))) showApp(false, true);
+  return r;
+};
+rawFetch('/api/me').then((r) => r.json()).then((j) => showApp(j.authed, j.required))
+  .catch(() => showApp(true, false));   // 서버가 응답하지 않아도 화면은 열어 두고, 데이터 요청에서 오류가 나게 한다
+document.getElementById('login-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-go'), err = document.getElementById('login-err'), pw = document.getElementById('login-pw');
+  btn.disabled = true; err.textContent = '';
+  try {
+    const r = await rawFetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw.value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || '로그인하지 못했습니다.');
+    pw.value = ''; showApp(true, true);
+  } catch (ex) { err.textContent = ex.message; pw.select(); }
+  btn.disabled = false;
+};
+document.getElementById('logout').onclick = async () => {
+  await rawFetch('/api/logout', { method: 'POST' }).catch(() => {});
+  location.reload();   // 화면에 남은 조회 결과를 지우기 위해 새로 고친다
+};
+
 const PY = 3.3058;
 const $ = (id) => document.getElementById(id);
 const q = (s) => document.querySelector(s);

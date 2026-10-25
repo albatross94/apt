@@ -16,13 +16,16 @@ try {
 } catch {}
 
 const core = require('./lib/core');
+const auth = require('./lib/auth');
 
 const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units' };
+const AUTH_ROUTES = { '/api/login': 'login', '/api/logout': 'logout', '/api/me': 'me' };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname.startsWith('/api/')) {
+    if (AUTH_ROUTES[u.pathname]) return auth.respond(AUTH_ROUTES[u.pathname], req, res);
     const route = API_ROUTES[u.pathname];
     if (!route) { res.statusCode = 404; return res.end('Not found'); }
     return core.respond(route, req, res);
