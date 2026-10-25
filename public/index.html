@@ -170,7 +170,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   <div id="dash" hidden>
     <div class="gx-page">
       <header class="gx-head" id="top">
-        <p class="gx-eyebrow">국토교통부 실거래가 · 리포트</p>
+        <p class="gx-eyebrow">국토교통부 실거래가 공개자료 기반 분석 리포트</p>
         <h1 id="h-title"></h1>
         <p id="print-meta" class="gx-printonly"></p>
         <p id="h-sub"></p>
@@ -479,7 +479,7 @@ async function selectApt() {
   const built = (all.find((t) => t.built) || {}).built;
   state.apt = t0.apt;
   $('h-title').textContent = t0.apt;
-  $('h-sub').textContent = `${regionLabel()} ${dong}${built ? ' · ' + built + '년 준공' : ''} · 매매 ${periodLabel()} 계약분 · 전월세 ${periodLabel()} 계약분`;
+  $('h-sub').textContent = `${regionLabel()} ${dong}${built ? ' · ' + built + '년 준공' : ''} · 조회기간: ${periodLabel()}`;
   $('dash').hidden = false;
   render();
 }
