@@ -19,6 +19,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 @media print{.gx-tablewrap{max-height:none;overflow:visible}.gx-card,.gx-tile{break-inside:avoid}.gx-ctrl{display:none}}
 .gx-page{max-width:1100px;margin-inline:auto;display:flex;flex-direction:column;gap:var(--cds-gap-lg);font-variant-numeric:tabular-nums}
 .gx-head h1{font-weight:400;font-size:var(--cds-font-size-title);margin:0;text-wrap:balance}
+.gx-sech{font-size:var(--cds-font-size-title);font-weight:400;margin:var(--cds-gap-lg,1.5rem) 0 0}
 .gx-head p{margin:var(--cds-gap-xs) 0 0;color:var(--color-fg-muted)}
 .gx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:var(--cds-gap-md)}
 .gx-tile{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);display:flex;flex-direction:column;gap:var(--cds-gap-xs);min-width:0;cursor:pointer}
@@ -191,19 +192,23 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   <div id="dash" hidden>
     <div class="gx-page">
       <header class="gx-head" id="top">
+        <p class="gx-note" id="h-eyebrow">국토교통부 실거래가 · 리포트</p>
         <h1 id="h-title"></h1>
         <p id="h-sub"></p>
         <div class="gx-btns"><button type="button" class="gx-xl" id="xl-detail">엑셀로 내보내기 (.xlsx)</button>
         <button type="button" class="gx-xl" id="pdf-report">고객용 PDF 리포트</button><span class="gx-note" id="pdf-status"></span></div>
       </header>
 
-      <section id="tiles" aria-label="평형별 평균가"><div class="gx-tiles" id="tile-box"></div></section>
-
+      <section class="gx-card">
+        <h2>전용면적 선택</h2>
+        <p class="gx-note">면적마다 가격대가 다르므로, 같은 면적끼리만 비교해서 보여 드립니다.</p>
       <div class="gx-pickbar" id="pickbar">
         <span class="gx-lab">평형 선택</span>
         <div class="gx-chips" id="chips-pick" role="group" aria-label="평형 선택"></div>
         <span class="gx-hint">아래 그래프와 표가 모두 고른 평형에 맞춰 바뀝니다.</span>
       </div>
+      <section id="tiles" aria-label="평형별 평균가"><div class="gx-tiles" id="tile-box"></div></section>
+      </section>
 
       <section class="gx-card">
         <h2 id="h-scatter">개별 거래 분포</h2>
@@ -211,6 +216,17 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <div class="gx-legend" id="legend-scatter"></div>
         <div class="gx-plot"><div class="gx-chart" id="chart-scatter"></div><div class="gx-tip"></div></div>
         <p class="gx-note" id="meta-scatter"></p>
+      </section>
+
+      <section class="gx-card">
+        <h2>그래프에 쓴 거래 목록</h2>
+        <p class="gx-note" id="note-list"></p>
+        <div class="gx-tablewrap">
+          <table class="gx-table" id="tlist">
+            <thead><tr><th>계약일</th><th>동</th><th>평형</th><th>전용(㎡)</th><th>층</th><th>거래가(만원)</th><th>거래 방식</th><th>상태</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="gx-card" id="sec-wolse" hidden>
@@ -236,6 +252,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <div class="gx-tablewrap"><table class="gx-table" id="tconv"><thead></thead><tbody></tbody></table></div>
         <p class="gx-note" id="note-conv"></p>
       </section>
+
+      <h2 class="gx-sech">추가 분석</h2>
 
       <section class="gx-card">
         <h2 id="h-monthly">월별 평균 거래가</h2>
@@ -295,20 +313,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <div id="ask-out"></div>
       </section>
 
-      <section class="gx-card">
-        <h2>거래 내역</h2>
-        <p class="gx-note" id="note-list"></p>
-        <div class="gx-tablewrap">
-          <table class="gx-table" id="tlist">
-            <thead><tr><th>계약일</th><th>평형</th><th>전용(㎡)</th><th>층</th><th>거래가(만원)</th><th>유형</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
-
       <section class="gx-card" id="sec-info">
-        <h2>데이터 정보와 산출 방법</h2>
+        <h2>이 자료를 믿고 보실 수 있는 근거와 한계</h2>
         <dl class="gx-kv" id="info-kv"></dl>
         <p class="gx-note" id="info-warn"></p>
         <div class="gx-btns"><button type="button" class="gx-xl" id="dl-raw" style="margin-top:0">조회 원자료 내려받기 (.json)</button></div>
@@ -439,9 +445,9 @@ function selectApt() {
   const reg = state.regions.find((r) => r.code === sel.value) || { sido: '', name: '' };
   const dongs = d3.rollups(state.trades, (v) => v.length, (t) => t.dong).sort((a, b) => b[1] - a[1]);
   state.apt = t0.apt;
-  $('h-title').textContent = t0.apt;
-  const K = kindOf(state.kind);
-  $('h-sub').textContent = `${reg.sido} ${reg.name} ${dongs[0][0]} · 아파트 ${K.name}${state.kind === 'sale' ? '' : ' (' + K.price + ' 기준)'} · 전용면적(평형)별 · 단위 만원${state.kind === 'sale' ? ' · 해제(취소) 거래 제외' : ''} ·${ymLabel(state.from)} ~ ${ymLabel(state.to)}`;
+  const K0 = kindOf(state.kind);
+  $('h-title').textContent = t0.apt + ' ' + (state.kind === 'sale' ? '실거래가' : K0.name + ' 실거래가');
+  $('h-sub').textContent = `${reg.sido} ${reg.name} ${dongs[0][0]}${t0.built ? ' · ' + t0.built + '년 준공' : ''} · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} 계약분 · 단위 만원`;
 
   const chips = $('chips-pick');
   chips.replaceChildren();
@@ -719,11 +725,11 @@ function render() {
   const list = [...sub].sort((a, b) => (a.date < b.date ? 1 : -1));
   q('#note-list').textContent = `${where} · ${list.length.toLocaleString()}건 · 최근 거래순`;
   const wolse = state.kind === 'wolse';
-  q('#tlist thead tr').replaceChildren(...['계약일', '평형', '전용(㎡)', '층', `${PN}(만원)`, ...(wolse ? ['월세(만원)', '환산 보증금(만원)'] : []), state.kind === 'sale' ? '유형' : '계약구분']
+  q('#tlist thead tr').replaceChildren(...['계약일', '동', '평형', '전용(㎡)', '층', `${PN}(만원)`, ...(wolse ? ['월세(만원)', '환산 보증금(만원)'] : []), state.kind === 'sale' ? '거래 방식' : '계약구분', '상태']
     .map((t) => { const th = document.createElement('th'); th.textContent = t; return th; }));
   q('#tlist tbody').replaceChildren(...list.slice(0, 500).map((r) => {
     const tr = document.createElement('tr');
-    [r.date, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent), fmt(Math.round(convDeposit(r.price, r.rent)))] : []), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    [r.date, r.dong, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent), fmt(Math.round(convDeposit(r.price, r.rent)))] : []), r.gbn || '—', '정상'].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
     return tr;
   }));
   if (wolse) q('#note-list').textContent += ` · 환산 보증금 = 보증금 + 월세×12 ÷ 연 환산율(${rateNow()}%, 위 "전세·월세 환산"에서 변경) — 계산값이며 실제 계약조건이 아닙니다`;
@@ -772,7 +778,7 @@ $('rate').oninput = () => { if (state.trades.length) render(); };
 function scatterChart(sub, months, where) {
   const el = q('#chart-scatter'), PN = kindOf(state.kind).price;
   el.replaceChildren();
-  q('#h-scatter').textContent = `개별 ${kindOf(state.kind).name} 거래 분포 · ` + where;
+  q('#h-scatter').textContent = '거래 하나하나를 점으로 찍은 그래프 · ' + where;
   if (!sub.length) { el.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; return; }
   const single = state.pick !== ALL, MINN = 3;
   const utc = (s) => new Date(s + 'T00:00:00Z');
@@ -824,7 +830,7 @@ function scatterChart(sub, months, where) {
   const items = state.sizes.filter((s) => !single || s.label === state.pick).map((s) => ({ name: '전용 ' + s.label, color: col(state.sizes.indexOf(s)) }));
   if (med.length) items.push({ name: `월별 중위${PN}(${MINN}건 이상인 달)`, color: 'var(--color-fg)' });
   legend(q('#legend-scatter'), items);
-  q('#note-scatter').textContent = '점 하나가 신고된 실거래 1건입니다. 가공하지 않은 원자료라 거래별 편차와 최고·최저가를 그대로 볼 수 있어요.'
+  q('#note-scatter').textContent = '점 하나가 신고된 실거래 1건입니다. 세로축은 0원에서 시작하지 않고 이 면적의 가격 범위에 맞춰 표시했으니, 눈금의 숫자를 함께 읽어 주세요.'
     + (single ? ` 선은 월별 중위${PN}이며, 거래가 ${MINN}건 미만인 달은 대표성이 낮아 잇지 않았습니다.` : ' 평형이 섞이면 가격 선이 왜곡되므로, 위에서 평형을 고르면 중위가격 선이 나타납니다.')
     + (lag ? ' 회색 구간(최근 30일)은 신고 기한 때문에 아직 거래가 덜 잡혔을 수 있습니다.' : '');
   const pr = pts.map((p) => p.y), recent = pts.filter((p) => p.x >= d3.utcMonth.offset(last, -6));
