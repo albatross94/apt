@@ -241,11 +241,13 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <label class="gx-note" for="pdf-tel">고객 연락처 (선택)</label>
     <input id="pdf-tel" type="tel" maxlength="30" autocomplete="off" placeholder="예: 010-1234-5678">
     <fieldset id="pdf-co">
-      <legend>리포트 머리 문구 (고객에게 보이는 회사 정보)</legend>
+      <legend>리포트 머리 문구 (고객에게 보이는 회사 정보 · 비우면 해당 항목은 빠짐)</legend>
       <label class="gx-note" for="pdf-co-name">회사명</label>
       <input id="pdf-co-name" type="text" maxlength="30" autocomplete="off">
       <label class="gx-note" for="pdf-co-sub">부제 (단지명·지점 등)</label>
       <input id="pdf-co-sub" type="text" maxlength="40" autocomplete="off">
+      <label class="gx-note" for="pdf-co-rep">대표 공인중개사 성명 (선택)</label>
+      <input id="pdf-co-rep" type="text" maxlength="20" autocomplete="off" placeholder="예: 홍길동">
       <label class="gx-note" for="pdf-co-tel">전화번호</label>
       <input id="pdf-co-tel" type="tel" maxlength="30" autocomplete="off">
     </fieldset>
@@ -1086,13 +1088,13 @@ const pdfDlg = $('pdf-dlg');
 let pdfLast = '', pdfTel = '';
 // 매매·전세·월세 탭은 분석리포트 양식(이미지 PDF), 공시가격·단지비교 탭은 브라우저 인쇄로 저장한다
 const isReportTab = () => KINDS[state.tab] != null;
-const CO_KEY = 'aptReportCo', CO_DEFAULT = { name: '한산부동산', sub: '수원센트럴아이파크자이', tel: '031-234-1234' };
+const CO_KEY = 'aptReportCo', CO_DEFAULT = { name: '한산부동산', sub: '수원센트럴아이파크자이', tel: '031-234-1234', rep: '' };
 const loadCo = () => { try { return { ...CO_DEFAULT, ...JSON.parse(localStorage.getItem(CO_KEY) || '{}') }; } catch { return { ...CO_DEFAULT }; } };
 $('pdf-btn').onclick = () => {
   $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = '';
   const rep = isReportTab(), co = loadCo();
   $('pdf-co').hidden = !rep;
-  $('pdf-co-name').value = co.name; $('pdf-co-sub').value = co.sub; $('pdf-co-tel').value = co.tel;
+  $('pdf-co-name').value = co.name; $('pdf-co-sub').value = co.sub; $('pdf-co-rep').value = co.rep; $('pdf-co-tel').value = co.tel;
   $('pdf-how').textContent = rep ? '확인을 누르면 분석리포트(A4 3쪽) PDF가 바로 저장됩니다.' : '확인을 누르면 인쇄 창이 열립니다. 대상(프린터)을 PDF로 저장으로 고르세요.';
   $('pdf-ok').disabled = false;
   pdfDlg.showModal(); $('pdf-name').focus();
@@ -1123,7 +1125,7 @@ $('pdf-form').onsubmit = async (e) => {
 /* ---------- 분석리포트(A4) PDF: 앱 상태로 데이터를 만들고 public/report.js의 양식에 넣는다 ---------- */
 async function saveReportPdf(name, tel) {
   if (!window.html2canvas || !window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
-  const co = { name: $('pdf-co-name').value.trim(), sub: $('pdf-co-sub').value.trim(), tel: $('pdf-co-tel').value.trim() };
+  const co = { name: $('pdf-co-name').value.trim(), sub: $('pdf-co-sub').value.trim(), rep: $('pdf-co-rep').value.trim(), tel: $('pdf-co-tel').value.trim() };
   try { localStorage.setItem(CO_KEY, JSON.stringify(co)); } catch {}
   Report.setConfig(co);
   const D = buildReportData();
