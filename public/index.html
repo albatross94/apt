@@ -541,7 +541,7 @@ function saleBody(body, rows) {
     stat('가장 높은 거래', rows.length ? won(d3.max(rows, (t) => t.price)) : '-'),
     stat('최근 3개월 중간값', rec.length ? won(med(rec)) : '-', rec.length ? `${rec.length}건 · ${mmdd(cut)} ~ ${mmdd(latest)}` : '최근 3개월 거래 없음')));
   body.append(k);
-  dotChart(body, rows, '매매 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 금액이 나옵니다.`, [], true);
+  dotChart(body, rows, '실거래가 매매 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 금액이 나옵니다.`, [], true);
 }
 
 function jeonseBody(body, rows) {
@@ -559,7 +559,7 @@ function jeonseBody(body, rows) {
     stat('매매 대비 전세가율', r || '-', r ? `전세 ${won(med(rows))} ÷ 매매 ${won(med(sale))}${ratio(nw) ? ' · 신규 계약만 ' + ratio(nw) : ''}` : '비교할 매매 또는 전세 거래가 없음')));
   k.append(mk('p', '전세가율은 선순위 대출 등 권리관계를 반영하지 않은 수치입니다.', 'gx-note'));
   body.append(k);
-  dotChart(body, rows, '전세 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금이 나옵니다. 속이 빈 점은 갱신 계약입니다.`, [['신규', false], ['갱신', true]], true);
+  dotChart(body, rows, '실거래가 전세 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금이 나옵니다. 속이 빈 점은 갱신 계약입니다.`, [['신규', false], ['갱신', true]], true);
 }
 
 function wolseBody(body, rows) {
@@ -572,7 +572,7 @@ function wolseBody(body, rows) {
     stat('갱신 계약', `${rn.length}건`),
     stat('보증금 범위', rows.length ? `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}` : '-', '가장 낮은 ~ 가장 높은 보증금')));
   // 그래프는 매매·전세처럼 별도 카드로 둔다 (너비를 재려면 먼저 화면에 붙어 있어야 한다)
-  const g = card('월세 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금과 월세가 나옵니다.`);
+  const g = card('실거래가 월세 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금과 월세가 나옵니다.`);
   body.append(g);
   g.append(mk('div', '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
   contractLegend(g, rows);
