@@ -81,6 +81,20 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #gs-tbl th{cursor:pointer;user-select:none}
 .gx-foot{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);margin:0}
 .gx-empty{color:var(--color-fg-muted);padding:2rem 0;text-align:center}
+.gx-ctrl input{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:8rem;max-width:100%}
+.gx-badge{display:inline-block;font-size:.72rem;line-height:1.3;padding:0 .4rem;margin-left:.35rem;border-radius:999px;border:1px solid var(--color-bad);color:var(--color-bad);white-space:nowrap}
+.gx-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:0;font-size:var(--cds-font-size-caption)}
+.gx-kv dt{color:var(--color-fg-muted)}.gx-kv dd{margin:0;word-break:keep-all}
+.gx-warn{color:var(--color-bad)}
+.gx-table td.l,.gx-table th.l{text-align:left}
+.gx-chips.sm button{padding:.25rem .65rem}
+.gx-btns{display:flex;flex-wrap:wrap;gap:.5rem}
+#report{display:none;--color-bg:#fff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;--cds-chart-grid:#e6e9ef;--cds-chart-axis:#aab1bf;--cds-border:#c9cfda;
+--c0:#2a5bd7;--c1:#d9531e;--c2:#1c8c6e;--c3:#8a4fd1;--c4:#c29a0d;--c5:#0e8aa8;--c6:#c2417a;--c7:#6b7280;background:#fff;color:#1d2330;color-scheme:light;font-size:.8125rem;max-width:1000px;margin-inline:auto}
+#report h1{font-size:1.5rem;margin:0 0 .2rem}#report h2{font-size:1.0625rem;margin:1.1rem 0 .4rem;padding-bottom:.2rem;border-bottom:1px solid var(--color-border-line);break-after:avoid}
+#report p{margin:.25rem 0}#report ul{margin:.25rem 0;padding-left:1.2rem}#report section{break-inside:avoid}
+#report .gx-table th{position:static}#report .gx-table td:nth-child(-n+3){white-space:nowrap}#report .gx-tablewrap{max-height:none;overflow:visible}
+@media print{@page{margin:12mm}body.rpt .wrap>.gx-page{display:none}body.rpt #report{display:block}body.rpt{background:#fff}}
 </style></head>
 <body><div class="wrap">
 <div class="gx-page">
@@ -139,7 +153,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           <p class="gx-note" id="c-note-table"></p>
           <div class="gx-tablewrap">
             <table class="gx-table" id="c-tbl">
-              <thead><tr><th>단지</th><th>지역</th><th>평형</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th><th>최근 6개월 평균</th><th>최근 거래</th></tr></thead>
+              <thead><tr><th>단지</th><th>지역</th><th>평형</th><th>건수</th><th>평균</th><th>중위</th><th>최저</th><th>최고</th><th>최근 6개월 평균</th><th>최근 거래</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -179,7 +193,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <header class="gx-head" id="top">
         <h1 id="h-title"></h1>
         <p id="h-sub"></p>
-        <button type="button" class="gx-xl" id="xl-detail">엑셀로 내보내기 (.xlsx)</button>
+        <div class="gx-btns"><button type="button" class="gx-xl" id="xl-detail">엑셀로 내보내기 (.xlsx)</button>
+        <button type="button" class="gx-xl" id="pdf-report">고객용 PDF 리포트</button><span class="gx-note" id="pdf-status"></span></div>
       </header>
 
       <section id="tiles" aria-label="평형별 평균가"><div class="gx-tiles" id="tile-box"></div></section>
@@ -214,9 +229,22 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <p class="gx-note" id="meta-ratio"></p>
       </section>
 
+      <section class="gx-card" id="sec-conv" hidden>
+        <h2 id="h-conv">전세·월세 환산</h2>
+        <p class="gx-note" id="note-conv-top"></p>
+        <div class="gx-ctrl"><div class="gx-row"><label>연 환산율(%) · 사용자 설정<input id="rate" type="number" min="0.5" max="30" step="0.1" value="5"></label></div></div>
+        <div class="gx-tablewrap"><table class="gx-table" id="tconv"><thead></thead><tbody></tbody></table></div>
+        <p class="gx-note" id="note-conv"></p>
+      </section>
+
       <section class="gx-card">
         <h2 id="h-monthly">월별 평균 거래가</h2>
-        <p class="gx-note">그 달에 거래된 가격의 평균입니다. 점 위에 올리면 건수가 나와요. 거래가 없는 달은 이어 그리지 않습니다.</p>
+        <div class="gx-chips sm" id="metric-chips" role="group" aria-label="가격 지표">
+          <button type="button" data-m="avg">평균</button><button type="button" data-m="med">중위</button>
+          <button type="button" data-m="both">평균·중위·범위</button><button type="button" data-m="cnt">거래량</button>
+        </div>
+        <p class="gx-note" id="note-monthly"></p>
+        <div class="gx-legend" id="legend-monthly"></div>
         <div class="gx-plot"><div class="gx-chart" id="chart-all"></div><div class="gx-tip"></div></div>
       </section>
 
@@ -247,10 +275,24 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <p class="gx-note" id="note-table"></p>
         <div class="gx-tablewrap">
           <table class="gx-table" id="tbl">
-            <thead><tr><th>평형</th><th>연도</th><th>건수</th><th>평균</th><th>최저</th><th>최고</th></tr></thead>
+            <thead><tr><th>평형</th><th>연도</th><th>건수</th><th>평균</th><th>중위</th><th>최저</th><th>최고</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="gx-card" id="sec-ask">
+        <h2 id="h-ask">현재 호가와 실거래 비교</h2>
+        <p class="gx-note">매물 호가는 실제 계약가격이 아닙니다. 호가를 직접 입력하면 같은 단지·같은 평형의 최근 실거래와 비교합니다. 호가 자료는 이 앱이 수집하지 않으며, 입력한 값은 저장·전송되지 않고 이 화면에서만 쓰입니다.</p>
+        <div class="gx-ctrl"><div class="gx-row">
+          <label>평형<select id="ask-size"></select></label>
+          <label id="ask-p-l">호가(만원)<input id="ask-price" type="number" min="0" step="100" placeholder="예: 125000"></label>
+          <label id="ask-r-l">월세 호가(만원)<input id="ask-rent" type="number" min="0" step="1" placeholder="예: 80"></label>
+          <label>층(선택)<input id="ask-floor" type="number" min="1" step="1" style="min-width:5rem;width:5rem"></label>
+          <label>호가 출처<input id="ask-src" type="text" placeholder="예: ○○부동산 매물" style="min-width:11rem"></label>
+          <label>호가 기준일<input id="ask-date" type="date"></label>
+        </div></div>
+        <div id="ask-out"></div>
       </section>
 
       <section class="gx-card">
@@ -265,10 +307,19 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       </section>
 
 
+      <section class="gx-card" id="sec-info">
+        <h2>데이터 정보와 산출 방법</h2>
+        <dl class="gx-kv" id="info-kv"></dl>
+        <p class="gx-note" id="info-warn"></p>
+        <div class="gx-btns"><button type="button" class="gx-xl" id="dl-raw" style="margin-top:0">조회 원자료 내려받기 (.json)</button></div>
+      </section>
+
       <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 매매는 해제(취소) 거래를 제외했고, 평형은 전용면적을 기준으로 묶었습니다. 전세·월세는 보증금을 기준으로 집계하며, 월세가 있는 계약은 월세, 없는 계약은 전세로 나눴습니다.</p>
     </div>
   </div>
-</div></div>
+</div>
+<div id="report" aria-hidden="true"></div>
+</div>
 
 <script>
 const ALL = '전체';
@@ -284,7 +335,10 @@ const pyeong = (a) => Math.round(a / PY);
 // 매매는 거래가, 전세·월세는 보증금(price)을 기준으로 집계한다. 월세는 rent(만원/월)를 따로 보여준다.
 const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
 const kindOf = (k) => KINDS[k] || KINDS.sale;
-const state = { view: 'detail', kind: 'sale', cmp: [], regions: [], raw: [], from: '', to: '', trades: [], sizes: [], pick: ALL, apt: null };
+const state = { view: 'detail', kind: 'sale', cmp: [], regions: [], raw: [], from: '', to: '', trades: [], sizes: [], pick: ALL, apt: null, metric: 'avg', rawAll: [], loadInfo: null };
+const LOW = 3;   // 이 건수 미만이면 "표본 적음"
+const med = (a) => (a.length ? d3.median(a, (r) => r.price) : null);
+const lowBadge = (n) => { const s = document.createElement('span'); s.className = 'gx-badge'; s.textContent = '표본 적음'; return n < LOW ? s : null; };
 
 /* ---------- 조회 조건 ---------- */
 const sel = $('region');
@@ -321,6 +375,8 @@ $('go').onclick = async () => {
     const kind = $('kind').value;
     const trades = await loadTrades(sel.value, from, to, (d, n) => { st.textContent = `불러오는 중… ${d}/${n}개월`; }, kind);
     state.from = from; state.to = to; state.lawd = sel.value; state.kind = kind;
+    state.rawAll = trades;
+    state.loadInfo = { at: new Date(), months: monthsInRange(from, to).length, canceled: trades.filter((t) => t.canceled).length };
     state.raw = trades.filter((t) => !t.canceled);
     st.textContent = `${kindOf(kind).name} 거래 ${state.raw.length.toLocaleString()}건` + (kind === 'sale' ? ' (해제 제외)' : '');
     buildAptOptions();
@@ -430,7 +486,8 @@ function lineChart(el, o) {
   const m = { t: 12, r: o.end ? 52 : 16, b: 28, l: 46 };
   const all = o.series.flatMap((s) => s.pts);
   if (!all.length) { el.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; return; }
-  const ymin = d3.min(all, (p) => p.y), ymax = d3.max(all, (p) => p.y);
+  const yv = all.map((p) => p.y).concat((o.band || []).flatMap((b) => [b.lo, b.hi]));
+  const ymin = o.zero ? 0 : d3.min(yv), ymax = d3.max(yv);
   const pad = (ymax - ymin) * 0.08 || 1000;
   const y = d3.scaleLinear([ymin - pad, ymax + pad], [H - m.b, m.t]).nice();
   const x = o.x.range([m.l, W - m.r]);
@@ -439,14 +496,16 @@ function lineChart(el, o) {
     .attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
   axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(o.xticks).tickFormat(o.xfmt).tickSizeOuter(0)));
   axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(o.yfmt || ((d) => eok(d) + '억')).tickSize(0)).call((g) => g.select('.domain').remove()));
+  const split = (pts) => { const segs = []; let cur = []; pts.forEach((p, i) => { if (i && o.gap(pts[i - 1], p)) { segs.push(cur); cur = []; } cur.push(p); }); if (cur.length) segs.push(cur); return segs; };
+  if (o.band && o.band.length) for (const sg of split(o.band)) if (sg.length > 1)
+    svg.append('path').attr('d', d3.area().x((p) => x(p.x)).y0((p) => y(p.lo)).y1((p) => y(p.hi))(sg)).style('fill', o.bandColor || 'var(--c0)').attr('opacity', 0.14);
   for (const s of o.series) {
-    const segs = []; let cur = [];
-    s.pts.forEach((p, i) => { if (i && o.gap(s.pts[i - 1], p)) { segs.push(cur); cur = []; } cur.push(p); });
-    if (cur.length) segs.push(cur);
-    for (const sg of segs) if (sg.length > 1)
+    for (const sg of split(s.pts)) if (sg.length > 1)
       svg.append('path').attr('d', d3.line().x((p) => x(p.x)).y((p) => y(p.y))(sg)).attr('fill', 'none')
         .attr('stroke-width', 2.5).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').style('stroke', s.color);
-    svg.selectAll(null).data(s.pts).join('circle').attr('cx', (p) => x(p.x)).attr('cy', (p) => y(p.y)).attr('r', 3.2).style('fill', s.color);
+    // 표본이 적은 점(o.low)은 속이 빈 점으로 그려 구분한다
+    svg.selectAll(null).data(s.pts).join('circle').attr('cx', (p) => x(p.x)).attr('cy', (p) => y(p.y)).attr('r', 3.4)
+      .style('fill', (p) => (o.low && o.low(p) ? 'var(--color-bg)' : s.color)).style('stroke', s.color).attr('stroke-width', (p) => (o.low && o.low(p) ? 1.8 : 0));
   }
   if (o.end) {
     const ls = o.series.filter((s) => s.pts.length).map((s) => ({ s, py: y(s.pts.at(-1).y), px: x(s.pts.at(-1).x) })).sort((a, b) => a.py - b.py);
@@ -463,7 +522,7 @@ function lineChart(el, o) {
       for (const f of flat) { const d = (x(f.p.x) - mx) ** 2 + (y(f.p.y) - my) ** 2; if (d < bd) { bd = d; best = f; } }
       if (!best) return;
       dot.style('display', null).attr('cx', x(best.p.x)).attr('cy', y(best.p.y)).style('stroke', best.s.color);
-      tip(el, [o.tipTitle(best.p), `${best.s.name} ${(o.valfmt || won)(best.p.y)} · ${best.p.n}건`], x(best.p.x), y(best.p.y));
+      tip(el, [o.tipTitle(best.p), `${best.s.name} ${(o.valfmt || won)(best.p.y)} · ${best.p.n}건`, o.tipExtra ? o.tipExtra(best.p) : ''].filter(Boolean), x(best.p.x), y(best.p.y));
     })
     .on('pointerleave', () => { dot.style('display', 'none'); hideTip(el); });
 }
@@ -496,16 +555,20 @@ function render() {
     const b = trades.filter((t) => t.size === s.label && t.year === endY - 1);
     const aa = avg(a), bb = avg(b);
     const t = document.createElement('div'); t.className = 'gx-tile' + (pick === s.label ? ' gx-on' : '');
+    const md = med(a);
     t.innerHTML = `<div class="gx-k">전용 ${s.label} · 약 ${s.py}평</div>
-      <div class="gx-v">${aa == null ? '—' : fmt(Math.round(aa))}<small>만원</small></div>
-      <div class="gx-d">${endY - 1}년 대비 ${aa && bb ? d3.format('+.1%')(aa / bb - 1) : '—'} · ${endY}년 ${a.length}건</div>`
-      + (state.kind === 'wolse' && a.length ? `<div class="gx-d">평균 월세 ${fmt(Math.round(d3.mean(a, (r) => r.rent)))}만원</div>` : '');
+      <div class="gx-v">${aa == null ? '—' : fmt(Math.round(aa))}<small>만원 평균</small></div>
+      <div class="gx-d">중위 ${md == null ? '—' : fmt(Math.round(md))}만원</div>
+      <div class="gx-d">${endY - 1}년 대비 ${aa && bb ? d3.format('+.1%')(aa / bb - 1) : '—'} · ${endY}년 ${a.length}건${a.length && a.length < LOW ? ' <span class="gx-badge">표본 적음</span>' : ''}</div>`
+      + (state.kind === 'wolse' && a.length ? `<div class="gx-d">월세 평균 ${fmt(Math.round(d3.mean(a, (r) => r.rent)))} · 중위 ${fmt(Math.round(d3.median(a, (r) => r.rent)))}만원</div>` : '');
     t.addEventListener('click', () => { state.pick = s.label; render(); });
     return t;
   }));
 
   const PN = kindOf(state.kind).price;
-  q('#h-monthly').textContent = `월별 평균 ${PN} · ` + where;
+  const M = state.metric, MN = { avg: '평균', med: '중위', both: '평균·중위·범위', cnt: '거래 건수' }[M];
+  q('#h-monthly').textContent = (M === 'cnt' ? '월별 거래 건수(평형별)' : `월별 ${MN} ${PN}`) + ' · ' + where;
+  [...q('#metric-chips').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === M)));
   q('#h-year').textContent = '월별·연도별 비교 · ' + where;
   q('#note-mix').hidden = pick !== ALL;
 
@@ -516,19 +579,41 @@ function render() {
   // 차트 1: 월별 평균 (평형별 선)
   const e1 = q('#chart-all');
   const parse = (s) => new Date(s + '-01T00:00:00Z');
-  const series1 = sizes.map((s, i) => ({
-    name: s.label, color: col(i),
-    pts: months.map((mo) => ({ mo, rows: trades.filter((t) => t.size === s.label && t.ym === mo) }))
-      .filter((o) => o.rows.length).map((o) => ({ x: parse(o.mo), y: avg(o.rows), n: o.rows.length, ym: o.mo })),
-  })).filter((s) => s.pts.length && (pick === ALL || s.name === pick));
+  const stat = (rows, mo) => ({ x: parse(mo), n: rows.length, ym: mo, lo: d3.min(rows, (r) => r.price), hi: d3.max(rows, (r) => r.price) });
+  let series1, band = null;
+  if (M === 'both') {
+    // 고른 평형(전체면 모든 평형 합산)의 월별 평균·중위와 최저~최고 범위
+    const mp = months.map((mo) => ({ mo, rows: sub.filter((t) => t.ym === mo) })).filter((o) => o.rows.length)
+      .map((o) => ({ ...stat(o.rows, o.mo), a: avg(o.rows), m: med(o.rows) }));
+    series1 = [{ name: '평균', color: 'var(--c0)', pts: mp.map((p) => ({ ...p, y: p.a })) }, { name: '중위', color: 'var(--c1)', pts: mp.map((p) => ({ ...p, y: p.m })) }];
+    band = mp.map((p) => ({ x: p.x, lo: p.lo, hi: p.hi }));
+  } else {
+    series1 = sizes.map((s, i) => ({
+      name: s.label, color: col(i),
+      pts: months.map((mo) => ({ mo, rows: trades.filter((t) => t.size === s.label && t.ym === mo) }))
+        .filter((o) => o.rows.length).map((o) => ({ ...stat(o.rows, o.mo), y: M === 'avg' ? avg(o.rows) : M === 'med' ? med(o.rows) : o.rows.length })),
+    })).filter((s) => s.pts.length && (pick === ALL || s.name === pick));
+  }
+  legend(q('#legend-monthly'), M === 'both' ? [{ name: '평균', color: 'var(--c0)' }, { name: '중위', color: 'var(--c1)' }, { name: '최저~최고 범위(옅은 영역)', color: 'color-mix(in srgb, var(--c0) 25%, transparent)' }] : []);
+  const anyLow = M !== 'cnt' && series1.some((s) => s.pts.some((p) => p.n < LOW));
+  q('#note-monthly').textContent = {
+    avg: '그 달 거래가의 평균입니다. 일부 고가·저가 거래에 영향을 받을 수 있어 중위와 함께 보세요.',
+    med: '그 달 거래가를 순서대로 놓았을 때 가운데 값입니다. 일부 고가·저가 거래의 영향을 덜 받습니다.',
+    both: '평균과 중위가 많이 벌어지면 일부 거래가 가격 수준을 끌어올리거나 내렸다는 뜻입니다. 옅은 영역은 그 달의 최저가~최고가입니다.',
+    cnt: '평형별 월별 신고 건수입니다. 건수가 적은 달의 가격은 대표성이 낮습니다.',
+  }[M] + ' 점 위에 올리면 건수와 최저·최고가가 나옵니다. 거래가 없는 달은 이어 그리지 않습니다.'
+    + (anyLow ? ` 속이 빈 점은 거래 ${LOW}건 미만인 달(표본 적음)입니다.` : '');
   const narrow = e1.clientWidth < 520;
   const step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
   lineChart(e1, {
-    series: series1, h: 320, end: true,
+    series: series1, h: 320, end: M !== 'both', band, bandColor: 'var(--c0)', zero: M === 'cnt',
     x: d3.scaleUtc().domain([parse(months[0]), parse(months.at(-1))]),
     xticks: d3.utcMonth.every(narrow ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'),
     gap: (a, b) => (b.x - a.x) / 2592000000 > 3.5,
     tipTitle: (p) => p.ym.replace('-', '년 ') + '월',
+    low: M === 'cnt' ? null : (p) => p.n < LOW,
+    tipExtra: M === 'cnt' ? null : (p) => `최저 ${won(p.lo)} ~ 최고 ${won(p.hi)}` + (p.n < LOW ? ' · 표본 적음' : ''),
+    yfmt: M === 'cnt' ? (d) => (Number.isInteger(d) ? d : '') : undefined, valfmt: M === 'cnt' ? () => '거래' : undefined,
   });
 
   // 차트 2: 월별·연도별 겹쳐보기
@@ -550,7 +635,7 @@ function render() {
   q('#h-bars').textContent = pick === ALL ? `연도·평형별 평균 ${PN}` : `연도별 평균 ${PN} · ` + where;
   q('#note-bars').textContent = pick === ALL ? '평형마다 연도별 평균을 나란히 놓았습니다. 막대 위에 올리면 건수가 나와요.' : '고른 평형의 연도별 평균입니다. 막대 위 숫자는 억 단위예요.';
   e3.replaceChildren();
-  const yrRows = d3.rollups(trades, (v) => ({ avg: avg(v), n: v.length, min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) }),
+  const yrRows = d3.rollups(trades, (v) => ({ avg: avg(v), med: med(v), n: v.length, min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) }),
     (t) => t.size, (t) => t.year).flatMap(([size, ys]) => ys.map(([year, o]) => ({ size, year, ...o })));
   const rows3 = pick === ALL ? yrRows : yrRows.filter((r) => r.size === pick);
   {
@@ -560,7 +645,7 @@ function render() {
     svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
     axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat((d) => eok(d) + '억').tickSize(0)).call((g) => g.select('.domain').remove()));
     const onTip = (s) => s
-      .on('pointermove', (ev, r) => { const [mx, my] = d3.pointer(ev, e3); tip(e3, [`전용 ${r.size} · ${r.year}년`, `평균 ${won(r.avg)} · ${r.n}건`], mx, my); })
+      .on('pointermove', (ev, r) => { const [mx, my] = d3.pointer(ev, e3); tip(e3, [`전용 ${r.size} · ${r.year}년`, `평균 ${won(r.avg)} · 중위 ${won(r.med)}`, `${r.n}건 · 최저 ${won(r.min)} ~ 최고 ${won(r.max)}` + (r.n < LOW ? ' · 표본 적음' : '')], mx, my); })
       .on('pointerleave', () => hideTip(e3));
     if (pick === ALL) {
       legend(q('#legend-bars'), years.map((yr, i) => ({ name: yr + '년', color: col(i) })));
@@ -615,7 +700,7 @@ function render() {
   // 요약표
   q('#h-table').textContent = pick === ALL ? '연도·평형별 요약표' : '연도별 요약표 · ' + where;
   q('#note-table').textContent = pick === ALL ? '금액 단위는 만원입니다. 맨 아래 "전체" 줄은 모든 평형을 합친 값이에요.' : '고른 평형의 요약입니다. 금액 단위는 만원이고, 건수가 적은 해는 한 건의 가격이 평균을 좌우합니다.';
-  const summ = (size, year, v) => ({ size, year, n: v.length, avg: avg(v), min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) });
+  const summ = (size, year, v) => ({ size, year, n: v.length, avg: avg(v), med: med(v), min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) });
   const tbl = [];
   for (const s of labels) for (const yr of years) {
     const v = trades.filter((t) => t.size === s && t.year === yr);
@@ -624,7 +709,8 @@ function render() {
   if (pick === ALL) for (const yr of years) { const v = trades.filter((t) => t.year === yr); if (v.length) tbl.push(summ(ALL, yr, v)); }
   q('#tbl tbody').replaceChildren(...tbl.map((r) => {
     const tr = document.createElement('tr');
-    [r.size, String(r.year), fmt(r.n), fmt(Math.round(r.avg)), fmt(r.min), fmt(r.max)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    [r.size, String(r.year), fmt(r.n), fmt(Math.round(r.avg)), fmt(Math.round(r.med)), fmt(r.min), fmt(r.max)].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    const b = lowBadge(r.n); if (b) tr.children[2].append(b);
     return tr;
   }));
 
@@ -632,14 +718,53 @@ function render() {
   const list = [...sub].sort((a, b) => (a.date < b.date ? 1 : -1));
   q('#note-list').textContent = `${where} · ${list.length.toLocaleString()}건 · 최근 거래순`;
   const wolse = state.kind === 'wolse';
-  q('#tlist thead tr').replaceChildren(...['계약일', '평형', '전용(㎡)', '층', `${PN}(만원)`, ...(wolse ? ['월세(만원)'] : []), state.kind === 'sale' ? '유형' : '계약구분']
+  q('#tlist thead tr').replaceChildren(...['계약일', '평형', '전용(㎡)', '층', `${PN}(만원)`, ...(wolse ? ['월세(만원)', '환산 보증금(만원)'] : []), state.kind === 'sale' ? '유형' : '계약구분']
     .map((t) => { const th = document.createElement('th'); th.textContent = t; return th; }));
   q('#tlist tbody').replaceChildren(...list.slice(0, 500).map((r) => {
     const tr = document.createElement('tr');
-    [r.date, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent)] : []), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    [r.date, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent), fmt(Math.round(convDeposit(r.price, r.rent)))] : []), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
     return tr;
   }));
+  if (wolse) q('#note-list').textContent += ` · 환산 보증금 = 보증금 + 월세×12 ÷ 연 환산율(${rateNow()}%, 위 "전세·월세 환산"에서 변경) — 계산값이며 실제 계약조건이 아닙니다`;
+  convTable(sub);
+  askRender();
+  infoRender();
 }
+
+/* ---------- 전세·월세 환산 (사용자 설정 연 환산율) ---------- */
+const rateNow = () => { const v = parseFloat($('rate').value); return v > 0 ? v : 5; };
+const convDeposit = (dep, rent) => dep + rent * 12 / (rateNow() / 100);   // 월세 → 전세 상당 보증금(만원)
+const convRent = (dep) => dep * (rateNow() / 100) / 12;                    // 전세 보증금 → 월세(보증금 0 가정, 만원)
+function convTable(sub) {
+  const sec = $('sec-conv');
+  sec.hidden = state.kind === 'sale';
+  if (sec.hidden) return;
+  const wolse = state.kind === 'wolse', r = rateNow();
+  q('#h-conv').textContent = (wolse ? '월세 → 전세 환산' : '전세 → 월세 환산') + ' · ' + (state.pick === ALL ? '전체 평형' : '전용 ' + state.pick);
+  q('#note-conv-top').textContent = wolse
+    ? '월세 계약의 보증금과 월 임대료를 따로 집계하고, 월세를 전세 보증금으로 바꾸면 얼마쯤인지 계산합니다.'
+    : '전세 보증금을 같은 금액의 월세(보증금 0원 기준)로 바꾸면 얼마쯤인지 계산합니다.';
+  const head = wolse ? ['평형', '건수', '보증금 중위', '월 임대료 중위', '환산 전세금(중위 기준)'] : ['평형', '건수', '전세보증금 중위', '환산 월세(보증금 0원 기준)'];
+  q('#tconv thead').replaceChildren((() => { const tr = document.createElement('tr'); head.forEach((h, i) => { const th = document.createElement('th'); th.textContent = h; if (!i) th.className = 'l'; tr.append(th); }); return tr; })());
+  const rows = [];
+  for (const s of state.sizes) {
+    if (state.pick !== ALL && s.label !== state.pick) continue;
+    const v = sub.filter((t) => t.size === s.label); if (!v.length) continue;
+    const dep = med(v);
+    const rent = wolse ? d3.median(v, (t) => t.rent) : 0;
+    rows.push({ n: v.length, cells: wolse ? ['전용 ' + s.label, fmt(v.length), fmt(Math.round(dep)), fmt(Math.round(rent)), fmt(Math.round(convDeposit(dep, rent)))]
+      : ['전용 ' + s.label, fmt(v.length), fmt(Math.round(dep)), fmt(Math.round(convRent(dep)))] });
+  }
+  q('#tconv tbody').replaceChildren(...rows.map((o) => {
+    const tr = document.createElement('tr');
+    o.cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.append(td); });
+    const b = lowBadge(o.n); if (b) tr.children[1].append(b);
+    return tr;
+  }));
+  q('#note-conv').textContent = (wolse ? `환산 전세금 = 보증금 + 월세 × 12 ÷ 연 환산율(${r}%)` : `환산 월세 = 전세보증금 × 연 환산율(${r}%) ÷ 12`)
+    + '. 연 환산율은 직접 정하는 가정값이며 법정 전월세 전환율과 다를 수 있고, 표의 값은 계산 결과일 뿐 실제 계약조건이 아닙니다. 단위는 만원입니다.';
+}
+$('rate').oninput = () => { if (state.trades.length) render(); };
 
 /* ---------- 개별 거래 산점도 (원자료 그대로 + 월별 중위가격) ---------- */
 // 점 = 실제 신고된 거래 1건. 선 = 월별 중위가격(한 평형만 골랐고 그 달 3건 이상일 때만). 신고 지연이 있는 최근 30일은 음영.
@@ -810,6 +935,225 @@ function ratioChart(months) {
   q('#meta-ratio').textContent = '최근 ' + series.map((s) => { const l = s.pts.at(-1); return `${s.name} ${l.y.toFixed(1)}% (${l.ym.replace('-', '.')}, 매매 ${l.ns}·전세 ${l.nj}건)`; }).join(' · ')
     + ' · 출처 국토교통부 실거래가 공개시스템(계약일 기준)';
 }
+
+/* ---------- 공통 DOM 도우미 ---------- */
+const mk = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+function mkTable(head, rows, left = [0]) {
+  const t = mk('table', null, 'gx-table'), tr0 = mk('tr');
+  head.forEach((h, i) => tr0.append(mk('th', h, left.includes(i) ? 'l' : '')));
+  t.append(mk('thead')); t.firstChild.append(tr0);
+  const tb = mk('tbody');
+  for (const r of rows) {
+    const tr = mk('tr');
+    r.forEach((c, i) => { const td = mk('td', null, left.includes(i) ? 'l' : ''); if (c instanceof Node) td.append(c); else td.textContent = c; tr.append(td); });
+    tb.append(tr);
+  }
+  t.append(tb);
+  const w = mk('div', null, 'gx-tablewrap'); w.append(t); return w;
+}
+function mkKv(pairs) {
+  const d = mk('dl', null, 'gx-kv');
+  for (const [k, v] of pairs) { d.append(mk('dt', k)); const dd = mk('dd'); if (v instanceof Node) dd.append(v); else dd.textContent = v; d.append(dd); }
+  return d;
+}
+const tagSize = (t) => state.sizes.find((c) => t.area >= c.lo - 1.5 && t.area <= c.hi + 1.5);
+const dstr = (d) => `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+const dtstr = (d) => `${dstr(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const regionLabel = () => { const r = state.regions.find((x) => x.code === state.lawd) || { sido: '', name: '' }; return `${r.sido} ${r.name}`.trim(); };
+const recentCut = (months) => (months.length > 6 ? months[months.length - 6] : months[0]);
+
+/* ---------- 현재 호가와 실거래 비교 (호가는 사용자가 직접 입력) ---------- */
+function askRender() {
+  const out = $('ask-out'), selz = $('ask-size');
+  const wolse = state.kind === 'wolse', KN = kindOf(state.kind).name;
+  q('#h-ask').textContent = `현재 호가와 실거래 비교 · ${KN}`;
+  $('ask-p-l').firstChild.nodeValue = (wolse ? '보증금' : KN) + ' 호가(만원)';
+  $('ask-r-l').hidden = !wolse;
+  const sig = state.sizes.map((s) => s.label).join(',') + '|' + state.apt;
+  if (selz.dataset.sig !== sig) {
+    selz.replaceChildren(...state.sizes.map((s) => new Option(`전용 ${s.label} (약 ${s.py}평)`, s.label)));
+    const top = d3.rollups(state.trades, (v) => v.length, (t) => t.size).sort((a, b) => b[1] - a[1])[0];
+    selz.value = top ? top[0] : ''; selz.dataset.sig = sig; selz.dataset.pick = '';
+  }
+  if (state.pick !== ALL && selz.dataset.pick !== state.pick) selz.value = state.pick;
+  selz.dataset.pick = state.pick;
+  const size = selz.value, months = monthsInRange(), cut = recentCut(months);
+  const all = state.trades.filter((t) => t.size === size), rec = all.filter((t) => t.ym >= cut);
+  const use = rec.length >= LOW ? rec : all, basis = rec.length >= LOW ? `최근 6개월(${cut.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec.length}건뿐)`;
+  out.replaceChildren();
+  if (!use.length) { out.append(mk('p', '이 평형은 조회 기간에 거래가 없어 비교할 수 없습니다.', 'gx-note')); return; }
+  const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price);
+  const price = parseFloat($('ask-price').value), rent = parseFloat($('ask-rent').value), floor = parseInt($('ask-floor').value, 10);
+  const pairs = [['비교 기준', `같은 단지 · 전용 ${size} · ${basis} 거래 ${use.length}건`], ['실거래 중위', won(mdn)], ['실거래 범위', `${won(lo)} ~ ${won(hi)}`]];
+  if (wolse) pairs.splice(2, 0, ['실거래 월세 중위', `${fmt(Math.round(d3.median(use, (t) => t.rent)))}만원`]);
+  const kv = mkKv(pairs);
+  const lb = lowBadge(use.length); if (lb) kv.children[1].append(lb);
+  out.append(kv);
+  if (!(price > 0)) { out.append(mk('p', `${wolse ? '보증금' : KN} 호가를 입력하면 차액과 비율, 유사 거래와의 비교가 나옵니다.`, 'gx-note')); return; }
+  const diff = price - mdn, pct = diff / mdn;
+  const above = use.filter((t) => t.price < price).length;
+  const res = [['입력한 호가', `${won(price)}` + (floor > 0 ? ` · ${floor}층` : '')], ['호가 − 실거래 중위', `${diff >= 0 ? '+' : '−'}${won(Math.abs(diff))} (${d3.format('+.2%')(pct)})`],
+    ['호가의 위치', `비교 거래 ${use.length}건 중 ${above}건보다 높고 ${use.filter((t) => t.price > price).length}건보다 낮음`],
+    ['호가 출처·기준일', `${$('ask-src').value.trim() || '출처 미입력'} · ${$('ask-date').value || '기준일 미입력'}`]];
+  if (wolse && rent >= 0 && $('ask-rent').value !== '') {
+    const rm = d3.median(use, (t) => t.rent);
+    res.splice(2, 0, ['월세 호가 − 실거래 월세 중위', `${rent - rm >= 0 ? '+' : '−'}${fmt(Math.round(Math.abs(rent - rm)))}만원 (호가 ${fmt(rent)}만원 / 중위 ${fmt(Math.round(rm))}만원)`]);
+  }
+  const kv2 = mkKv(res); kv2.style.marginTop = '.6rem'; out.append(kv2);
+  const sim = [...use].sort((a, b) => (floor > 0 ? Math.abs(a.floor - floor) - Math.abs(b.floor - floor) : 0) || (a.date < b.date ? 1 : -1)).slice(0, 8);
+  const head = ['계약일', '전용(㎡)', '층', ...(floor > 0 ? ['층 차이'] : []), `${kindOf(state.kind).price}(만원)`, ...(wolse ? ['월세(만원)'] : []), '호가 대비'];
+  out.append(mk('p', `유사 거래 ${sim.length}건 (${floor > 0 ? '입력한 층과 가까운 순, 같은 층이면 최근순' : '최근순'}) — 면적·층·거래 시점이 다르면 가격이 달라질 수 있습니다.`, 'gx-note'));
+  out.append(mkTable(head, sim.map((t) => [t.date, String(t.area), String(t.floor), ...(floor > 0 ? [`${t.floor - floor >= 0 ? '+' : ''}${t.floor - floor}`] : []), fmt(t.price), ...(wolse ? [fmt(t.rent)] : []),
+    `${price - t.price >= 0 ? '+' : '−'}${fmt(Math.abs(price - t.price))}`]), [0]));
+  out.append(mk('p', '호가는 매도·임대인이 부르는 가격이고 실거래가는 실제 체결 가격입니다. 둘의 차이가 곧 적정가격이나 협상 가능 금액을 뜻하지는 않습니다.', 'gx-note'));
+}
+['ask-size', 'ask-price', 'ask-rent', 'ask-floor', 'ask-src', 'ask-date'].forEach((id) => { $(id).addEventListener('input', () => { if (state.trades.length) askRender(); }); });
+
+/* ---------- 데이터 정보·신뢰도 ---------- */
+function infoRender() {
+  const I = state.loadInfo;
+  if (!I) return;
+  const K = kindOf(state.kind), tr = state.trades, areas = tr.map((t) => t.area);
+  const latest = d3.max(state.raw, (t) => t.date) || '';
+  const days = latest ? Math.floor((Date.now() - new Date(latest + 'T00:00:00').getTime()) / 86400000) : null;
+  q('#info-kv').replaceWith(Object.assign(mkKv([
+    ['데이터 출처', `국토교통부 실거래가 공개시스템(공공데이터포털 아파트 ${K.name} 실거래가 API), 계약일 기준`],
+    ['조회 지역·기간', `${regionLabel()} · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} (${I.months}개월)`],
+    ['데이터 수집 시각', `${dtstr(I.at)} · 서버 보관: 지난 달 자료는 그대로 보관, 이번 달 자료는 1시간 단위로 갱신`],
+    ['수집 상태', `정상 — ${I.months}개월 모두 수신 (지역 전체 ${fmt(state.rawAll.length)}건, 이 단지 ${fmt(tr.length)}건)`],
+    ['가장 최근 계약일', latest ? `${latest} (${days}일 전, 지역 전체 기준)` : '—'],
+    ['면적 범위', `전용 ${d3.min(areas)}~${d3.max(areas)}㎡ · 전용면적 1.5㎡ 이내를 한 평형으로 묶어 ${state.sizes.length}개 평형으로 표시`],
+    ['해제(취소) 거래', state.kind === 'sale' ? `이 조회에서 ${fmt(I.canceled)}건이 해제 거래로 신고되어 모든 통계에서 제외` : '전월세 자료에는 해제 거래가 없어 제외 대상 없음'],
+    ['통계 산출 방법', `평균=산술평균, 중위=순서대로 놓은 가운데 값(짝수 건이면 가운데 두 값의 평균). 월·연도는 계약일 기준이며, 거래 ${LOW}건 미만은 "표본 적음"으로 표시합니다.`],
+    ['변경·정정', '신고 후 해제·정정될 수 있어 이 화면은 위 수집 시각 기준입니다. 아래 버튼으로 이 시각에 받은 원자료를 내려받아 보관·대조할 수 있습니다.'],
+  ]), { id: 'info-kv' }));
+  const w = [];
+  if (state.to === ym(new Date()) && days != null && days > 45) w.push(`가장 최근 계약일이 ${days}일 전입니다. 자료 갱신이 늦어졌을 수 있으니 공공데이터포털 상태를 확인하세요.`);
+  if (state.to === ym(new Date())) w.push('실거래 신고는 계약 후 30일까지 늦어질 수 있어 최근 한 달 거래는 덜 잡혔을 수 있습니다.');
+  q('#info-warn').textContent = w.join(' ');
+  q('#info-warn').className = 'gx-note' + (days != null && days > 45 && state.to === ym(new Date()) ? ' gx-warn' : '');
+}
+$('dl-raw').onclick = () => {
+  if (!state.loadInfo) return;
+  const body = { source: '국토교통부 실거래가 공개시스템(공공데이터포털 API)', kind: state.kind, lawd: state.lawd, region: regionLabel(), from: state.from, to: state.to,
+    collectedAt: state.loadInfo.at.toISOString(), note: '지역 전체 거래(해제 거래 포함, canceled=true)이며 서버가 정리한 필드입니다', count: state.rawAll.length, trades: state.rawAll };
+  const a = mk('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(body, null, 1)], { type: 'application/json' }));
+  a.download = `raw_${state.kind}_${state.lawd}_${state.from}-${state.to}_${dstr(state.loadInfo.at).replace(/\./g, '')}.json`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+q('#metric-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.metric = b.dataset.m; if (state.trades.length) render();
+});
+
+/* ---------- 고객용 PDF 리포트 (인쇄 → PDF로 저장) ---------- */
+async function kindRows(kind) {
+  if (kind === state.kind) return state.raw;
+  const key = [kind, state.lawd, state.from, state.to].join('|');
+  if (!otherRows.has(key)) otherRows.set(key, (await loadTrades(state.lawd, state.from, state.to, null, kind)).filter((t) => !t.canceled));
+  return otherRows.get(key);
+}
+const cloneChart = (id) => { const n = $(id).cloneNode(true); n.removeAttribute('id'); n.querySelectorAll('[id]').forEach((x) => x.removeAttribute('id')); return n; };
+
+async function buildReport() {
+  const aptK = aptKey(state.trades[0]), months = monthsInRange(), cut = recentCut(months), I = state.loadInfo;
+  const per = {};
+  for (const k of ['sale', 'jeonse', 'wolse']) {
+    per[k] = k === state.kind ? state.trades
+      : prepTrades(await kindRows(k), aptK).map((t) => ({ ...t, size: (tagSize(t) || {}).label })).filter((t) => t.size);
+  }
+  const K = kindOf(state.kind), pick = state.pick, labels = state.sizes.map((s) => s.label).filter((l) => pick === ALL || l === pick);
+  const inPick = (t) => pick === ALL || t.size === pick;
+  const R = $('report'); R.replaceChildren();
+  const sec = (title) => { const s = mk('section'); s.append(mk('h2', title)); R.append(s); return s; };
+  const t0 = state.trades[0], today = new Date();
+
+  R.append(mk('h1', `${state.apt} 가격분석 리포트`));
+  R.append(mk('p', `${regionLabel()} ${t0.dong} · ${pick === ALL ? '전체 평형' : '전용 ' + pick} · ${K.name} 화면 기준 · 조회 기준일 ${dstr(today)}`, 'gx-note'));
+
+  let s = sec('1. 단지 기본정보');
+  const areas = state.trades.map((t) => t.area);
+  s.append(mkKv([['아파트명', state.apt], ['지역', `${regionLabel()} ${t0.dong}`], ['준공연도', t0.built ? t0.built + '년' : '—'],
+    ['전용면적', `${d3.min(areas)}~${d3.max(areas)}㎡ (${state.sizes.map((z) => `${z.label} 약 ${z.py}평`).join(', ')})`],
+    ['분석 평형', pick === ALL ? '전체 평형' : `전용 ${pick}`], ['분석 기간', `${ymLabel(state.from)} ~ ${ymLabel(state.to)}`], ['조회 기준일', dstr(today)]]));
+
+  s = sec('2. 핵심 가격지표');
+  const rows = [];
+  for (const l of labels) for (const k of ['sale', 'jeonse', 'wolse']) {
+    const v = per[k].filter((t) => t.size === l), r = v.filter((t) => t.ym >= cut);
+    const names = { sale: '매매', jeonse: '전세', wolse: '월세' };
+    const one = (a, f) => (a.length ? f(a) : '—');
+    const m = (a) => (k === 'wolse' ? `보증금 ${won(med(a))} / 월세 ${fmt(Math.round(d3.median(a, (t) => t.rent)))}만원` : won(med(a)));
+    const av = (a) => (k === 'wolse' ? `보증금 ${won(avg(a))} / 월세 ${fmt(Math.round(d3.mean(a, (t) => t.rent)))}만원` : won(avg(a)));
+    const cnt = mk('span', fmt(v.length)); const b = lowBadge(v.length); if (b) cnt.append(b);
+    rows.push([`전용 ${l}`, names[k], cnt, one(v, m), one(v, av), v.length ? `${won(d3.min(v, (t) => t.price))} ~ ${won(d3.max(v, (t) => t.price))}` : '—', one(r, m) + (r.length ? ` (${r.length}건)` : '')]);
+  }
+  s.append(mkTable(['평형', '구분', '건수', '중위', '평균', '범위(최저~최고)', '최근 6개월 중위'], rows, [0, 1]));
+  s.append(mk('p', '월세는 보증금과 월 임대료를 따로 집계했습니다. 금액은 계약일이 조회 기간에 속한 거래이며, 매매는 해제(취소) 거래를 제외했습니다.', 'gx-note'));
+
+  s = sec(`3. 가격 추이 (${K.name} 기준)`);
+  for (const [id, lg, title] of [['chart-all', 'legend-monthly', q('#h-monthly').textContent], ['chart-count', null, q('#h-count').textContent], ['chart-scatter', 'legend-scatter', q('#h-scatter').textContent]]) {
+    const fig = mk('div'); fig.style.breakInside = 'avoid'; fig.append(mk('p', title, 'gx-note'));
+    if (lg && $(lg).children.length) fig.append(cloneChart(lg));
+    fig.append(cloneChart(id)); s.append(fig);
+  }
+  if (!$('sec-ratio').hidden && $('chart-ratio').querySelector('svg')) { const fig = mk('div'); fig.append(mk('p', q('#h-ratio').textContent, 'gx-note'), cloneChart('legend-ratio'), cloneChart('chart-ratio')); fig.style.breakInside = 'avoid'; s.append(fig); }
+  if (!$('sec-wolse').hidden && $('chart-wolse').querySelector('svg')) { const fig = mk('div'); fig.append(mk('p', q('#h-wolse').textContent, 'gx-note'), cloneChart('legend-wolse'), cloneChart('chart-wolse')); fig.style.breakInside = 'avoid'; s.append(fig); }
+
+  s = sec('4. 유사 거래 비교');
+  const cur = per[state.kind].filter(inPick), wolse = state.kind === 'wolse';
+  const recent = [...cur].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 10);
+  s.append(mk('p', `같은 단지 ${pick === ALL ? '전체 평형' : '전용 ' + pick}의 최근 ${K.name} 거래 ${recent.length}건입니다.`, 'gx-note'));
+  s.append(mkTable(['계약일', '전용(㎡)', '층', `${K.price}(만원)`, ...(wolse ? ['월세(만원)'] : [])], recent.map((t) => [t.date, String(t.area), String(t.floor), fmt(t.price), ...(wolse ? [fmt(t.rent)] : [])]), [0]));
+  if (parseFloat($('ask-price').value) > 0) { const a = mk('div'); a.append(mk('p', '현재 호가와 최근 실거래 비교', 'gx-note'), cloneChart('ask-out')); a.style.marginTop = '.6rem'; s.append(a); }
+
+  s = sec('5. 가격 분석 의견');
+  const ul = mk('ul'); s.append(ul);
+  const rec6 = cur.filter((t) => t.ym >= cut), prevMonths = months.slice(-12, -6), prev6 = cur.filter((t) => prevMonths.includes(t.ym));
+  if (rec6.length >= LOW && prev6.length >= LOW) {
+    const d = med(rec6) / med(prev6) - 1;
+    ul.append(mk('li', `최근 거래 흐름: ${K.name} 중위는 최근 6개월 ${won(med(rec6))}(${rec6.length}건), 직전 6개월 ${won(med(prev6))}(${prev6.length}건)로 ${d3.format('+.1%')(d)} 변했습니다.`));
+  } else ul.append(mk('li', `최근 거래 흐름: 최근 6개월(${rec6.length}건) 또는 직전 6개월(${prev6.length}건)의 거래가 ${LOW}건 미만이거나 조회 기간이 12개월 미만이라 추세 변화를 판단하지 않았습니다.`));
+  const gap = [];
+  for (const l of labels) {
+    const a = per.sale.filter((t) => t.size === l && t.ym >= cut), b = per.jeonse.filter((t) => t.size === l && t.ym >= cut);
+    if (a.length >= LOW && b.length >= LOW) gap.push(`전용 ${l} 약 ${(med(b) / med(a) * 100).toFixed(1)}%`);
+  }
+  ul.append(mk('li', gap.length ? `전세가율(최근 6개월 전세 중위 ÷ 매매 중위): ${gap.join(', ')}. 선순위 대출 등 권리관계는 반영하지 않은 수치입니다.` : '전세가율: 최근 6개월 매매·전세 거래가 각각 3건 이상인 평형이 없어 계산하지 않았습니다.'));
+  const ap = parseFloat($('ask-price').value);
+  if (ap > 0) {
+    const sz = $('ask-size').value, base = state.trades.filter((t) => t.size === sz && t.ym >= cut), use = base.length >= LOW ? base : state.trades.filter((t) => t.size === sz);
+    if (use.length) ul.append(mk('li', `비교 거래와의 차이: 입력한 호가(${won(ap)})는 전용 ${sz} 실거래 중위(${won(med(use))}) 대비 ${d3.format('+.1%')(ap / med(use) - 1)} 수준입니다(비교 ${use.length}건). 호가는 협상 전 가격이며 호가와 실거래의 차이가 적정가격을 뜻하지는 않습니다.`));
+  } else ul.append(mk('li', '비교 거래와의 차이: 호가가 입력되지 않아 실거래 간 비교만 제공했습니다.'));
+  const few = labels.filter((l) => per[state.kind].filter((t) => t.size === l).length < LOW);
+  ul.append(mk('li', `분석상의 한계: 이 분석은 ${K.name} 거래 ${fmt(cur.length)}건에 기초합니다.${few.length ? ` 전용 ${few.join(', ')}은(는) ${LOW}건 미만이라 참고용입니다.` : ''} 층·향·동·내부 상태·특약 등 개별 조건과 최근 30일 내 미신고 거래는 반영되지 않습니다.`));
+
+  s = sec('6. 출처 및 유의사항');
+  const ul2 = mk('ul'); s.append(ul2);
+  [`자료 출처: 국토교통부 실거래가 공개시스템(공공데이터포털 API), 계약일 기준`,
+    `데이터 수집 시각: ${dtstr(I.at)} (리포트 작성 ${dtstr(today)})`,
+    `해제 거래 처리: 매매 해제(취소) 신고 거래는 모든 통계에서 제외했습니다(이 조회에서 ${fmt(I.canceled)}건). 전월세 자료에는 해제 거래가 없습니다.`,
+    `통계 산출: 평균=산술평균, 중위=가운데 값. 평형은 전용면적 1.5㎡ 이내를 한 평형으로 묶었고, 거래 ${LOW}건 미만은 표본 적음입니다. 월세 환산액은 사용자가 정한 연 환산율(${rateNow()}%)에 따른 계산값입니다.`,
+    '이 리포트는 참고 자료이며 감정평가·투자자문이 아닙니다. 신고 후 거래가 해제·정정될 수 있어 계약 전에 최신 자료로 다시 확인하세요.'].forEach((t) => ul2.append(mk('li', t)));
+}
+
+async function printReport() {
+  if (!state.trades.length || !state.loadInfo) return;
+  const btn = $('pdf-report'), st = $('pdf-status');
+  btn.disabled = true; st.textContent = '리포트 자료를 모으는 중…';
+  try {
+    await buildReport();
+    st.textContent = '인쇄 창에서 "PDF로 저장"을 선택하세요.';
+    const title = document.title, d = new Date();
+    document.title = `${state.apt}_가격분석리포트_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    document.body.classList.add('rpt');
+    const done = () => { document.body.classList.remove('rpt'); document.title = title; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+  } catch (e) { st.textContent = '리포트를 만들지 못했습니다: ' + e.message; }
+  btn.disabled = false;
+}
+$('pdf-report').onclick = printReport;
 
 /* ---------- 실거래가 불러오기 ---------- */
 // 한 달씩 나눠 4개씩 동시에 요청한다. 서버리스 함수의 실행 시간 제한을 피하고, 달마다 결과가 공유 캐시(CDN)에 쌓인다.
@@ -1013,7 +1357,7 @@ function renderCompare() {
     const r = rowsOf(e), v = r.map(val), recent = r.filter((t) => t.ym >= cut);
     const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
     const tr = document.createElement('tr');
-    [name(e), e.regionName, pickName(e), fmt(r.length), r.length ? fmt(Math.round(d3.mean(v))) : '—', r.length ? fmt(Math.round(d3.min(v))) : '—',
+    [name(e), e.regionName, pickName(e), fmt(r.length), r.length ? fmt(Math.round(d3.mean(v))) : '—', r.length ? fmt(Math.round(d3.median(v))) : '—', r.length ? fmt(Math.round(d3.min(v))) : '—',
       r.length ? fmt(Math.round(d3.max(v))) : '—', recent.length ? fmt(Math.round(d3.mean(recent, val))) : '—',
       last ? `${last.date} · ${fmt(last.price)}` : '—']
       .forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
@@ -1045,11 +1389,17 @@ function buildDetailWb() {
       '전용 평당가(만원)': ppy(t), [state.kind === 'sale' ? '거래유형' : '계약구분']: t.gbn, '법정동': t.dong, '지번': t.jibun, '준공년도': t.built,
     })), [12, 9, 12, 6, 14, 14, 16, 10, 10, 10, 10]), '거래내역');
 
-  const summ = (size, year, v) => ({ '평형': size, '연도': year, '건수': v.length, '평균(만원)': avgInt(v), '최저(만원)': d3.min(v, (r) => r.price), '최고(만원)': d3.max(v, (r) => r.price) });
+  const summ = (size, year, v) => ({ '평형': size, '연도': year, '건수': v.length, '표본 적음': v.length < LOW ? '표본 적음' : '', '평균(만원)': avgInt(v), '중위(만원)': Math.round(med(v)), '최저(만원)': d3.min(v, (r) => r.price), '최고(만원)': d3.max(v, (r) => r.price) });
   const ys = [];
   for (const s of labels) for (const yr of years) { const v = trades.filter((t) => t.size === s && t.year === yr); if (v.length) ys.push(summ(s, yr, v)); }
   for (const yr of years) { const v = trades.filter((t) => t.year === yr); if (v.length) ys.push(summ('전체', yr, v)); }
-  XLSX.utils.book_append_sheet(wb, xlSheet(ys, [9, 8, 8, 12, 12, 12]), '연도별 요약');
+  XLSX.utils.book_append_sheet(wb, xlSheet(ys, [9, 8, 8, 10, 12, 12, 12, 12]), '연도별 요약');
+
+  XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
+    const row = { '계약월': m, '전체': trades.some((t) => t.ym === m) ? Math.round(med(trades.filter((t) => t.ym === m))) : undefined };
+    for (const s of labels) { const v = trades.filter((t) => t.size === s && t.ym === m); row[s] = v.length ? Math.round(med(v)) : undefined; }
+    return row;
+  }), [10, 12, ...labels.map(() => 12)]), '월별 중위가(만원)');
 
   XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
     const row = { '계약월': m, '전체': avgInt(trades.filter((t) => t.ym === m)) };
@@ -1082,12 +1432,12 @@ function buildCompareWb() {
     const last = r.length ? r.reduce((a, b) => (b.date > a.date ? b : a)) : null;
     return {
       '단지': name(e), '지역': e.regionName, '평형': e.pick === ALL ? '전체' : e.pick, '지표': mname, '건수': r.length,
-      '평균': r.length ? Math.round(d3.mean(v)) : undefined, '최저': r.length ? Math.round(d3.min(v)) : undefined,
+      '평균': r.length ? Math.round(d3.mean(v)) : undefined, '중위': r.length ? Math.round(d3.median(v)) : undefined, '최저': r.length ? Math.round(d3.min(v)) : undefined,
       '최고': r.length ? Math.round(d3.max(v)) : undefined,
       '최근 6개월 평균': recent.length ? Math.round(d3.mean(recent, val)) : undefined,
       '최근 거래일': last ? last.date : undefined, '최근 거래금액(만원)': last ? last.price : undefined,
     };
-  }), [30, 14, 8, 18, 8, 10, 10, 10, 16, 12, 18]), '단지별 요약');
+  }), [30, 14, 8, 18, 8, 10, 10, 10, 10, 16, 12, 18]), '단지별 요약');
 
   XLSX.utils.book_append_sheet(wb, xlSheet(months.map((m) => {
     const row = { '계약월': m };
