@@ -493,6 +493,13 @@ const bandOf = (t) => FLOOR_BANDS.find((b) => t.floor >= b[2] && t.floor <= b[3]
 const inBand = (rows) => (state.band == null ? rows : rows.filter((t) => bandOf(t) === FLOOR_BANDS[state.band]));
 function bandLegend(k, rows, summary, withLine) {
   const lg = mk('div', null, state.band == null ? 'gx-legend' : 'gx-legend sel'); k.append(lg);
+  // 맨 앞 '전체': 층 구간 선택을 풀고 모든 거래를 보여 준다
+  const all = mk('button'), ai = mk('i');
+  all.type = 'button'; all.setAttribute('aria-pressed', String(state.band == null));
+  all.addEventListener('click', () => { state.band = null; render(); });
+  ai.style.cssText = 'border-radius:50%;background:var(--color-fg-muted)';
+  all.append(ai, mk('b', '전체'), document.createTextNode(` 모든 층 · ${rows.length}건${rows.length ? ' · ' + summary(rows) : ''}`));
+  lg.append(all);
   FLOOR_BANDS.forEach((b, bi) => {
     const v = rows.filter((t) => bandOf(t) === b), sp = mk('button'), i = mk('i');
     sp.type = 'button'; sp.title = '누르면 이 층 구간만 봅니다'; sp.setAttribute('aria-pressed', String(state.band === bi));
