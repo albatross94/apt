@@ -191,6 +191,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       </div>
 
       <section class="gx-card">
+        <h2 id="h-scatter">개별 거래 분포</h2>
+        <p class="gx-note" id="note-scatter"></p>
+        <div class="gx-legend" id="legend-scatter"></div>
+        <div class="gx-plot"><div class="gx-chart" id="chart-scatter"></div><div class="gx-tip"></div></div>
+        <p class="gx-note" id="meta-scatter"></p>
+      </section>
+
+      <section class="gx-card">
         <h2 id="h-monthly">월별 평균 거래가</h2>
         <p class="gx-note">그 달에 거래된 가격의 평균입니다. 점 위에 올리면 건수가 나와요. 거래가 없는 달은 이어 그리지 않습니다.</p>
         <div class="gx-plot"><div class="gx-chart" id="chart-all"></div><div class="gx-tip"></div></div>
@@ -485,6 +493,8 @@ function render() {
   q('#h-year').textContent = '월별·연도별 비교 · ' + where;
   q('#note-mix').hidden = pick !== ALL;
 
+  scatterChart(sub, months, where);
+
   // 차트 1: 월별 평균 (평형별 선)
   const e1 = q('#chart-all');
   const parse = (s) => new Date(s + '-01T00:00:00Z');
@@ -611,6 +621,72 @@ function render() {
     [r.date, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent)] : []), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
     return tr;
   }));
+}
+
+/* ---------- 개별 거래 산점도 (원자료 그대로 + 월별 중위가격) ---------- */
+// 점 = 실제 신고된 거래 1건. 선 = 월별 중위가격(한 평형만 골랐고 그 달 3건 이상일 때만). 신고 지연이 있는 최근 30일은 음영.
+function scatterChart(sub, months, where) {
+  const el = q('#chart-scatter'), PN = kindOf(state.kind).price;
+  el.replaceChildren();
+  q('#h-scatter').textContent = `개별 ${kindOf(state.kind).name} 거래 분포 · ` + where;
+  if (!sub.length) { el.innerHTML = '<div class="gx-empty">표시할 거래가 없습니다.</div>'; return; }
+  const single = state.pick !== ALL, MINN = 3;
+  const utc = (s) => new Date(s + 'T00:00:00Z');
+  const first = utc(months[0] + '-01'), last = d3.utcMonth.offset(utc(months.at(-1) + '-01'), 1);
+  const today = new Date(), todayU = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const lagFrom = d3.utcDay.offset(todayU, -30);
+  const pts = sub.map((t) => ({ ...t, x: utc(t.date), y: t.price, si: state.sizes.findIndex((z) => z.label === t.size) }));
+  const med = !single ? [] : months.map((mo) => ({ mo, v: pts.filter((p) => p.ym === mo) })).filter((o) => o.v.length >= MINN)
+    .map((o) => ({ x: utc(o.mo + '-16'), y: d3.median(o.v, (p) => p.y), n: o.v.length, mo: o.mo }));
+
+  const W = Math.max(el.clientWidth, 280), H = 340, m = { t: 12, r: 16, b: 28, l: 52 };
+  const ys = d3.extent(pts, (p) => p.y), pad = (ys[1] - ys[0]) * 0.08 || 1000;
+  const y = d3.scaleLinear([ys[0] - pad, ys[1] + pad], [H - m.b, m.t]).nice();
+  const x = d3.scaleUtc([first, last], [m.l, W - m.r]);
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`);
+  svg.append('g').selectAll('line').data(y.ticks(6)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--cds-chart-grid)');
+  const lag = lagFrom < last && todayU >= first;
+  if (lag) {
+    const x0 = x(lagFrom < first ? first : lagFrom), x1 = x(todayU > last ? last : todayU);
+    svg.append('rect').attr('x', x0).attr('y', m.t).attr('width', Math.max(0, x1 - x0)).attr('height', H - m.t - m.b).style('fill', 'var(--cds-chart-muted)').attr('opacity', 0.25);
+    svg.append('text').attr('x', x1 - 4).attr('y', m.t + 12).attr('text-anchor', 'end').text('신고 집계 중').style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+  }
+  const narrow = el.clientWidth < 520, step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
+  axisStyle(svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(d3.utcMonth.every(narrow ? step * 2 : step)).tickFormat(d3.utcFormat('%y.%m')).tickSizeOuter(0)));
+  axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickFormat((d) => eok(d) + '억').tickSize(0)).call((g) => g.select('.domain').remove()));
+  svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (p) => x(p.x)).attr('cy', (p) => y(p.y)).attr('r', 3.6)
+    .attr('opacity', 0.55).style('fill', (p) => col(p.si));
+  if (med.length) {
+    const segs = []; let cur = [];
+    med.forEach((p, i) => { if (i && (p.x - med[i - 1].x) / 2592000000 > 3.5) { segs.push(cur); cur = []; } cur.push(p); });
+    segs.push(cur);
+    for (const sg of segs) if (sg.length > 1) svg.append('path').attr('d', d3.line().x((p) => x(p.x)).y((p) => y(p.y))(sg)).attr('fill', 'none')
+      .attr('stroke-width', 2.5).attr('stroke-linejoin', 'round').style('stroke', 'var(--color-fg)');
+    svg.append('g').selectAll('circle').data(med).join('circle').attr('cx', (p) => x(p.x)).attr('cy', (p) => y(p.y)).attr('r', 4)
+      .style('fill', 'var(--color-bg)').style('stroke', 'var(--color-fg)').attr('stroke-width', 2);
+  }
+  const dot = svg.append('circle').attr('r', 7).attr('fill', 'none').attr('stroke-width', 2).style('stroke', 'var(--color-fg)').style('display', 'none');
+  svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const [mx, my] = d3.pointer(ev);
+      let best = null, bd = Infinity;
+      for (const p of pts) { const d = (x(p.x) - mx) ** 2 + (y(p.y) - my) ** 2; if (d < bd) { bd = d; best = p; } }
+      if (!best || bd > 26 ** 2) { dot.style('display', 'none'); hideTip(el); return; }
+      dot.style('display', null).attr('cx', x(best.x)).attr('cy', y(best.y));
+      tip(el, [`${best.date} · ${best.floor}층 · 전용 ${best.area}㎡`, `${PN} ${won(best.y)}` + (state.kind === 'wolse' ? ` · 월세 ${fmt(best.rent)}만원` : '')], x(best.x), y(best.y));
+    })
+    .on('pointerleave', () => { dot.style('display', 'none'); hideTip(el); });
+
+  const items = state.sizes.filter((s) => !single || s.label === state.pick).map((s) => ({ name: '전용 ' + s.label, color: col(state.sizes.indexOf(s)) }));
+  if (med.length) items.push({ name: `월별 중위${PN}(${MINN}건 이상인 달)`, color: 'var(--color-fg)' });
+  legend(q('#legend-scatter'), items);
+  q('#note-scatter').textContent = '점 하나가 신고된 실거래 1건입니다. 가공하지 않은 원자료라 거래별 편차와 최고·최저가를 그대로 볼 수 있어요.'
+    + (single ? ` 선은 월별 중위${PN}이며, 거래가 ${MINN}건 미만인 달은 대표성이 낮아 잇지 않았습니다.` : ' 평형이 섞이면 가격 선이 왜곡되므로, 위에서 평형을 고르면 중위가격 선이 나타납니다.')
+    + (lag ? ' 회색 구간(최근 30일)은 신고 기한 때문에 아직 거래가 덜 잡혔을 수 있습니다.' : '');
+  const pr = pts.map((p) => p.y), recent = pts.filter((p) => p.x >= d3.utcMonth.offset(last, -6));
+  q('#meta-scatter').textContent = `표본 ${fmt(pts.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중위 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))}`
+    + (recent.length ? ` · 최근 6개월 ${recent.length}건 중위 ${won(d3.median(recent, (p) => p.y))}` : '')
+    + ` · 출처 국토교통부 실거래가 공개시스템(계약일 기준), 조회 ${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}`;
 }
 
 /* ---------- 실거래가 불러오기 ---------- */
