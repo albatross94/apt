@@ -754,7 +754,6 @@ function askCard(body, rows, tab) {
   k.append(ctrl, out); body.append(k);
 
   function upd() {
-    k.classList.toggle('no-print', !(parseFloat(A.price) > 0));   // 호가를 입력하지 않았으면 PDF에 넣지 않는다
     const months = monthsInRange(), cut = months.length > 6 ? months[months.length - 6] : months[0];
     const rec = rows.filter((t) => t.ym >= cut), recOk = rec.length >= LOW, use = recOk ? rec : rows;
     const basis = recOk ? `최근 6개월(${cut.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec.length}건뿐)`;
