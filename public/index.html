@@ -707,6 +707,7 @@ function tradeList(body, rows) {
   const list = [...rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 500);
   const tbl = mkTable(['계약일', '동', '층', sale ? '거래가(만원)' : '보증금(만원)', ...(wolse ? ['월세(만원)'] : []), sale ? '거래 방식' : '계약구분', '상태'],
     list.map((r) => [r.date, r.dong, String(r.floor), fmt(r.price), ...(wolse ? [fmt(r.rent)] : []), r.gbn || '—', '정상']), [0, 1]);
+  k.classList.add('no-print');   // PDF에는 넣지 않는다
   k.append(tbl); body.append(k);
 }
 
