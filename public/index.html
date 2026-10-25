@@ -84,6 +84,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-warnbox{background:#fff3dc;border:1px solid #f0d49a;color:#7a4b00;border-radius:8px;padding:.65rem .9rem;font-size:var(--cds-font-size-caption)}
 @media (prefers-color-scheme:dark){.gx-warnbox{background:#3a2e12;border-color:#6b5420;color:#f1d28a}}
 .gx-table.num th:nth-child(2),.gx-table.num td:nth-child(2){text-align:right}
+.gx-legend button{font:inherit;color:inherit;display:inline-flex;align-items:center;gap:.35rem;border:1px solid transparent;background:transparent;border-radius:8px;padding:.2rem .5rem;cursor:pointer}
+.gx-legend button:hover{border-color:var(--cds-border)}
+.gx-legend button[aria-pressed="true"]{background:var(--color-bg);border-color:var(--color-fg)}
+.gx-legend.sel button[aria-pressed="false"]{opacity:.45}
 .gx-eyebrow{margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium)}
 </style></head>
 <body><div class="wrap">
@@ -150,7 +154,7 @@ const pyeong = (a) => Math.round(a / PY);
 // 매매는 거래가, 전세·월세는 보증금(price)을 기준으로 집계한다. 월세는 rent(만원/월)를 따로 보여준다.
 const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
 const kindOf = (k) => KINDS[k] || KINDS.sale;
-const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, apt: null, aptKey: null, loadInfo: null };
+const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, apt: null, aptKey: null, loadInfo: null };
 const LOW = 3;   // 이 건수 미만이면 "표본 적음"
 const med = (a) => (a.length ? d3.median(a, (r) => r.price) : null);
 
@@ -379,7 +383,7 @@ function render() {
   const body = $('tab-body'); body.replaceChildren();
   const rows = D[tab].filter((t) => t.area === pick);
   ({ sale: saleBody, jeonse: jeonseBody, wolse: wolseBody })[tab](body, rows);
-  tradeList(body, rows);
+  tradeList(body, inBand(rows));   // 목록은 그래프에 쓴 거래와 같게 맞춘다
   infoRender();
 }
 
@@ -398,7 +402,7 @@ function saleBody(body, rows) {
     stat('가장 높은 거래', rows.length ? won(d3.max(rows, (t) => t.price)) : '-'),
     stat('최근 3개월 중간값', rec.length ? won(med(rec)) : '-', rec.length ? `${rec.length}건 · ${mmdd(cut)} ~ ${mmdd(latest)}` : '최근 3개월 거래 없음')));
   body.append(k);
-  dotChart(body, rows, '거래 하나하나를 점으로 찍은 그래프', `점 하나가 신고된 실거래 1건입니다. 세로축은 0원에서 시작하지 않고 이 면적의 가격 범위에 맞춰 표시했으니, 눈금의 숫자를 함께 읽어 주세요.`, []);
+  dotChart(body, rows, '거래 하나하나를 점으로 찍은 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 금액이 나옵니다.`, [], true);
 }
 
 function jeonseBody(body, rows) {
@@ -416,7 +420,7 @@ function jeonseBody(body, rows) {
     stat('매매 대비 전세가율', r || '-', r ? `전세 ${won(med(rows))} ÷ 매매 ${won(med(sale))}${ratio(nw) ? ' · 신규 계약만 ' + ratio(nw) : ''}` : '비교할 매매 또는 전세 거래가 없음')));
   k.append(mk('p', '전세가율은 선순위 대출 등 권리관계를 반영하지 않은 수치입니다.', 'gx-note'));
   body.append(k);
-  dotChart(body, rows, '전세 보증금을 점으로 찍은 그래프', '점 하나가 신고된 전세 계약 1건입니다. 속이 빈 점은 갱신 계약입니다. 세로축은 0원에서 시작하지 않으니 눈금의 숫자를 함께 읽어 주세요.', [['신규', false], ['갱신', true]]);
+  dotChart(body, rows, '거래 하나하나를 점으로 찍은 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 보증금이 나옵니다. 속이 빈 점은 갱신 계약입니다.`, [['신규', false], ['갱신', true]], true);
 }
 
 function wolseBody(body, rows) {
@@ -430,6 +434,8 @@ function wolseBody(body, rows) {
     stat('보증금 범위', rows.length ? `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}` : '-', '가장 낮은 ~ 가장 높은 보증금')));
   k.append(mk('div', '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
   const lg = mk('div', null, 'gx-legend'); k.append(lg); legendDots(lg, [['신규', false], ['갱신', true]]);
+  bandLegend(k, rows, (v) => `중간값 보증금 ${won(med(v))} · 월세 ${fmtRent(d3.median(v, (t) => t.rent))}만원`, false);
+  rows = inBand(rows);
   rentPlot(k, rows);
   k.append(mk('h3', '보증금 구간별 월세', 'gx-rsub'));
   const bins = [['보증금 5천만원 미만', 0, 5000], ['5천만원 ~ 1억원 미만', 5000, 10000], ['1억원 ~ 2억원 미만', 10000, 20000], ['2억원 이상 (반전세)', 20000, Infinity]];
@@ -460,8 +466,9 @@ function plot(el, pts, o) {
   axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(o.yticks || 5).tickFormat(o.yfmt).tickSize(0)).call((g) => g.select('.domain').remove()));
   const P = pts.map((t) => ({ t, px: x(o.xv(t)), py: y(o.yv(t)) }));
   svg.append('g').selectAll('circle').data(P).join('circle').attr('cx', (p) => p.px).attr('cy', (p) => p.py).attr('r', 4)
-    .style('fill', (p) => (p.t.gbn === '갱신' ? 'var(--color-bg)' : o.color)).style('stroke', o.color)
+    .style('fill', (p) => (p.t.gbn === '갱신' ? 'var(--color-bg)' : (o.colorOf ? o.colorOf(p.t) : o.color))).style('stroke', (p) => (o.colorOf ? o.colorOf(p.t) : o.color))
     .attr('stroke-width', (p) => (p.t.gbn === '갱신' ? 2 : 0)).attr('opacity', (p) => (p.t.gbn === '갱신' ? 1 : 0.7));
+  if (o.after) o.after(svg, x, y);
   const dot = svg.append('circle').attr('r', 8).attr('fill', 'none').attr('stroke-width', 2).style('stroke', 'var(--color-fg)').style('display', 'none');
   svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
     .on('pointermove', (ev) => {
@@ -480,11 +487,36 @@ function plotBox(parent) {
 }
 
 // 계약일–가격 점 그래프 (매매·전세)
-function dotChart(body, rows, title, note, legendItems) {
+const bandOf = (t) => FLOOR_BANDS.find((b) => t.floor >= b[2] && t.floor <= b[3]) || FLOOR_BANDS[0];
+// 층 구간(저·중·고층) 범례. 구간마다 건수와 요약값을 보여 주고, withLine이면 월별 중간값 선 설명을 덧붙인다
+// 고른 층 구간(state.band)만 남긴다. 구간을 다시 누르면 전체로 돌아간다
+const inBand = (rows) => (state.band == null ? rows : rows.filter((t) => bandOf(t) === FLOOR_BANDS[state.band]));
+function bandLegend(k, rows, summary, withLine) {
+  const lg = mk('div', null, state.band == null ? 'gx-legend' : 'gx-legend sel'); k.append(lg);
+  FLOOR_BANDS.forEach((b, bi) => {
+    const v = rows.filter((t) => bandOf(t) === b), sp = mk('button'), i = mk('i');
+    sp.type = 'button'; sp.title = '누르면 이 층 구간만 봅니다'; sp.setAttribute('aria-pressed', String(state.band === bi));
+    sp.addEventListener('click', () => { state.band = state.band === bi ? null : bi; render(); });
+    i.style.cssText = `border-radius:50%;background:${b[4]}`;
+    sp.append(i, mk('b', b[0]), document.createTextNode(` ${b[1]} · ${v.length}건${v.length ? ' · ' + summary(v) : ''}`));
+    lg.append(sp);
+  });
+  if (withLine) {
+    const sp = mk('span'), ln = mk('i');
+    ln.style.cssText = 'width:1.1rem;height:3px;border-radius:2px;background:var(--color-fg)';
+    sp.append(ln, mk('b', '월별 중간값'), document.createTextNode(' 한 달 3건 이상일 때만, 건너뛴 달은 선을 잇지 않음'));
+    lg.append(sp);
+  }
+}
+// bands: 층 구간별 색 + 월별 중간값 선
+const FLOOR_BANDS = [['저층', '1~8층', 1, 8, 'var(--c0)'], ['중층', '9~16층', 9, 16, 'var(--c1)'], ['고층', '17층 이상', 17, Infinity, 'var(--c2)']];
+function dotChart(body, rows, title, note, legendItems, bands) {
   const k = card(title, note);
   body.append(k);
   if (!rows.length) { k.append(mk('div', '표시할 거래가 없습니다.', 'gx-empty')); return; }
   if (legendItems.length) { const lg = mk('div', null, 'gx-legend'); k.append(lg); legendDots(lg, legendItems); }
+  if (bands) { bandLegend(k, rows, (v) => `중간값 ${won(med(v))}`, true); rows = inBand(rows); }
+  if (!rows.length) { k.append(mk('div', '이 층 구간에는 거래가 없습니다.', 'gx-empty')); return; }
   const utc = (s) => new Date(s + 'T00:00:00Z'), months = monthsInRange();
   const first = utc(months[0] + '-01'), last = d3.utcMonth.offset(utc(months.at(-1) + '-01'), 1);
   const ys = d3.extent(rows, (t) => t.price), pad = (ys[1] - ys[0]) * 0.08 || 1000;
@@ -492,12 +524,22 @@ function dotChart(body, rows, title, note, legendItems) {
   const el = plotBox(k), isSale = state.tab === 'sale';
   plot(el, rows, {
     x: d3.scaleUtc().domain([first, last]), y: d3.scaleLinear().domain([ys[0] - pad, ys[1] + pad]).nice(),
-    xv: (t) => utc(t.date), yv: (t) => t.price, color: 'var(--c0)',
+    xv: (t) => utc(t.date), yv: (t) => t.price, color: 'var(--c0)', colorOf: bands ? (t) => bandOf(t)[4] : null,
+    after: bands ? (svg, x, y) => {
+      // 한 달 3건 이상인 달만 중간값을 구하고, 달이 이어질 때만 선으로 잇는다
+      const med3 = months.map((mo) => ({ mo, v: rows.filter((t) => t.ym === mo) })).filter((o) => o.v.length >= 3)
+        .map((o) => ({ i: months.indexOf(o.mo), px: x(utc(o.mo + '-16')), py: y(d3.median(o.v, (t) => t.price)) }));
+      const segs = []; let cur = [];
+      med3.forEach((p, n) => { if (n && p.i - med3[n - 1].i > 1) { segs.push(cur); cur = []; } cur.push(p); });
+      if (cur.length) segs.push(cur);
+      for (const sg of segs) if (sg.length > 1) svg.append('path').attr('d', d3.line().x((p) => p.px).y((p) => p.py)(sg)).attr('fill', 'none').attr('stroke-width', 2.5).attr('stroke-linejoin', 'round').style('stroke', 'var(--color-fg)');
+      svg.append('g').selectAll('circle').data(med3).join('circle').attr('cx', (p) => p.px).attr('cy', (p) => p.py).attr('r', 4.5).style('fill', 'var(--color-bg)').style('stroke', 'var(--color-fg)').attr('stroke-width', 2);
+    } : null,
     xticks: d3.utcMonth.every(el.clientWidth < 520 ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'), yticks: 6, yfmt: (d) => eok(d) + '억',
-    tip: (t) => [`${t.date} · ${t.floor}층`, `${isSale ? '거래가' : '보증금'} ${won(t.price)}` + (t.gbn ? ` · ${t.gbn}` : '')],
+    tip: (t) => [`${t.date} · ${t.dong} · ${t.floor}층`, `${isSale ? '거래가' : '보증금'} ${won(t.price)}` + (t.gbn ? ` · ${t.gbn}` : '')],
   });
   const pr = rows.map((t) => t.price);
-  k.append(mk('p', `표본 ${fmt(rows.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중간값 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))} · 출처 국토교통부 실거래가 공개시스템(계약일 기준)`, 'gx-note'));
+  k.append(mk('p', `표본 ${fmt(rows.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중간값 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))} · 출처 국토교통부 실거래가 공개시스템(계약일 기준)${bands ? ' · 세로축은 0원에서 시작하지 않고 이 면적의 가격 범위에 맞춰 표시했으니 눈금의 숫자를 함께 읽어 주세요.' : ''}`, 'gx-note'));
 }
 
 // 보증금–월세 점 그래프 (월세). 두 축 모두 0에서 시작한다.
@@ -507,8 +549,8 @@ function rentPlot(k, rows) {
   const xf = (v) => (v === 0 ? '0' : v < 10000 ? `${+(v / 1000).toFixed(1)}천만` : `${+(v / 10000).toFixed(1)}억`);
   plot(el, rows, {
     x: d3.scaleLinear().domain([0, d3.max(rows, (t) => t.price)]).nice(), y: d3.scaleLinear().domain([0, d3.max(rows, (t) => t.rent)]).nice(),
-    xv: (t) => t.price, yv: (t) => t.rent, color: 'var(--color-fg)', xticks: el.clientWidth < 520 ? 4 : 6, xfmt: xf, yticks: 4, yfmt: (d) => `${d}만`,
-    tip: (t) => [`${t.date} · ${t.floor}층${t.gbn ? ' · ' + t.gbn : ''}`, `보증금 ${won(t.price)} · 월세 ${fmt(t.rent)}만원`],
+    xv: (t) => t.price, yv: (t) => t.rent, color: 'var(--c0)', colorOf: (t) => bandOf(t)[4], xticks: el.clientWidth < 520 ? 4 : 6, xfmt: xf, yticks: 4, yfmt: (d) => `${d}만`,
+    tip: (t) => [`${t.date} · ${t.dong} · ${t.floor}층${t.gbn ? ' · ' + t.gbn : ''}`, `보증금 ${won(t.price)} · 월세 ${fmt(t.rent)}만원`],
   });
 }
 
