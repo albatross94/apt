@@ -108,7 +108,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #pdf-dlg button{font:inherit;padding:.45rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 #pdf-dlg button.sec{background:transparent;color:var(--color-fg)}
 /* 인쇄(PDF)는 항상 밝은 색으로. 조회 조건·탭·버튼은 빼고, 선택 상자는 어떤 값을 골랐는지 보이도록 남긴다 */
+/* 브라우저가 붙이는 머리글·바닥글(날짜, 파일명)은 @page 여백을 0으로 두면 나오지 않는다.
+   대신 쪽마다 위아래 여백이 있도록, 반복되는 머리·바닥 표 그룹(.pf-h/.pf-f)에 빈 칸을 둔다 */
+@page{margin:0}
 @media print{
+  .wrap{padding:0 14mm}
+  .pf{display:table;width:100%}
+  .pf-h{display:table-header-group}.pf-b{display:table-row-group}.pf-f{display:table-footer-group}
+  .pf .sp{height:12mm}
   :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
     --cds-chart-grid:#e6e9ef;--cds-chart-axis:#aab1bf;--cds-border:#c9cfda;--cds-text-secondary:#5f6878;
     --c0:#2a5bd7;--c1:#d9531e;--c2:#1c8c6e;--c3:#8a4fd1;--c4:#c29a0d;--c5:#0e8aa8;--c6:#c2417a;--c7:#6b7280;color-scheme:light}
@@ -129,6 +136,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <button type="submit" id="login-go">로그인</button>
   </form>
 </div>
+<div class="pf"><div class="pf-h"><div class="sp"></div></div><div class="pf-b">
 <div class="gx-page" id="app" hidden>
 
   <section class="gx-card gx-ctrl no-print" aria-label="조회 조건">
@@ -152,8 +160,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <header class="gx-head" id="top">
         <p class="gx-eyebrow">국토교통부 실거래가 · 리포트</p>
         <h1 id="h-title"></h1>
-        <p id="h-sub"></p>
         <p id="print-meta" class="gx-printonly"></p>
+        <p id="h-sub"></p>
       </header>
 
       <section class="gx-card">
@@ -199,6 +207,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     </div>
   </div>
 </div>
+</div><div class="pf-f"><div class="sp"></div></div></div>
 </div>
 
 <dialog id="pdf-dlg">
@@ -1040,7 +1049,7 @@ $('pdf-form').onsubmit = (e) => {
   const tel = $('pdf-tel').value.trim();
   pdfLast = name; pdfTel = tel; pdfDlg.close();
   const old = document.title, now = new Date();
-  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name}${tel ? ' · 연락처 ' + tel : ''} · 저장일 ${dstr(now)}`;
+  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name}${tel ? ' · 연락처 ' + tel : ''} · 저장일시 ${dtstr(now)}`;
   document.title = pdfFile(name);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
   addEventListener('afterprint', () => { document.title = old; }, { once: true });
   setTimeout(() => print(), 100);
