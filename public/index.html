@@ -175,7 +175,7 @@ const pyeong = (a) => Math.round(a / PY);
 // 매매는 거래가, 전세·월세는 보증금(price)을 기준으로 집계한다. 월세는 rent(만원/월)를 따로 보여준다.
 const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
 const kindOf = (k) => KINDS[k] || KINDS.sale;
-const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, ask: { sale: {}, jeonse: {}, wolse: {} }, apt: null, aptKey: null, loadInfo: null };
+const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, cont: null, ask: { sale: {}, jeonse: {}, wolse: {} }, apt: null, aptKey: null, loadInfo: null };
 const LOW = 3;   // 이 건수 미만이면 "표본 적음"
 const med = (a) => (a.length ? d3.median(a, (r) => r.price) : null);
 
@@ -463,7 +463,7 @@ function wolseBody(body, rows) {
     stat('갱신 계약', `${rn.length}건`),
     stat('보증금 범위', rows.length ? `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}` : '-', '가장 낮은 ~ 가장 높은 보증금')));
   k.append(mk('div', '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
-  const lg = mk('div', null, 'gx-legend'); k.append(lg); legendDots(lg, [['신규', false], ['갱신', true]]);
+  contractLegend(k, rows);
   bandLegend(k, rows, (v) => `중간값 보증금 ${won(med(v))} · 월세 ${fmtRent(d3.median(v, (t) => t.rent))}만원`, false);
   rows = inBand(rows);
   rentPlot(k, rows);
@@ -520,8 +520,27 @@ function plotBox(parent) {
 const bandOf = (t) => FLOOR_BANDS.find((b) => t.floor >= b[2] && t.floor <= b[3]) || FLOOR_BANDS[0];
 // 층 구간(저·중·고층) 범례. 구간마다 건수와 요약값을 보여 주고, withLine이면 월별 중간값 선 설명을 덧붙인다
 // 고른 층 구간(state.band)만 남긴다. 구간을 다시 누르면 전체로 돌아간다
-const inBand = (rows) => (state.band == null ? rows : rows.filter((t) => bandOf(t) === FLOOR_BANDS[state.band]));
+const byBand = (rows) => (state.band == null ? rows : rows.filter((t) => bandOf(t) === FLOOR_BANDS[state.band]));
+// 전세·월세: 고른 계약 구분(신규·갱신)만 남긴다. 매매에는 적용하지 않는다
+const byCont = (rows) => (state.cont == null || state.tab === 'sale' ? rows : rows.filter((t) => t.gbn === state.cont));
+const inBand = (rows) => byBand(byCont(rows));
+// 전체 / 신규(채운 점) / 갱신(속이 빈 점) 버튼. 개수는 고른 층 구간 기준
+function contractLegend(k, rows) {
+  const base = byBand(rows), lg = mk('div', null, state.cont == null ? 'gx-legend' : 'gx-legend sel'); k.append(lg);
+  const item = (name, v, cont, hollow) => {
+    const b = mk('button'), i = mk('i');
+    b.type = 'button'; b.setAttribute('aria-pressed', String(state.cont === cont));
+    i.style.cssText = `border-radius:50%;box-sizing:border-box;${hollow === undefined ? 'background:var(--color-fg-muted)' : hollow ? 'background:transparent;border:2px solid var(--color-fg)' : 'background:var(--color-fg)'}`;
+    b.append(i, mk('b', name), document.createTextNode(` · ${v.length}건`));
+    b.addEventListener('click', () => { state.cont = state.cont === cont ? null : cont; render(); });
+    lg.append(b);
+  };
+  item('전체', base, null);
+  item('신규', base.filter((t) => t.gbn === '신규'), '신규', false);
+  item('갱신', base.filter((t) => t.gbn === '갱신'), '갱신', true);
+}
 function bandLegend(k, rows, summary, withLine) {
+  rows = byCont(rows);
   const lg = mk('div', null, state.band == null ? 'gx-legend' : 'gx-legend sel'); k.append(lg);
   // 맨 앞 '전체': 층 구간 선택을 풀고 모든 거래를 보여 준다
   const all = mk('button'), ai = mk('i');
@@ -551,7 +570,7 @@ function dotChart(body, rows, title, note, legendItems, bands) {
   const k = card(title, note);
   body.append(k);
   if (!rows.length) { k.append(mk('div', '표시할 거래가 없습니다.', 'gx-empty')); return; }
-  if (legendItems.length) { const lg = mk('div', null, 'gx-legend'); k.append(lg); legendDots(lg, legendItems); }
+  if (legendItems.length) contractLegend(k, rows);   // 전세: 신규·갱신 구분
   if (bands) { bandLegend(k, rows, (v) => `중간값 ${won(med(v))}`, true); rows = inBand(rows); }
   if (!rows.length) { k.append(mk('div', '이 층 구간에는 거래가 없습니다.', 'gx-empty')); return; }
   const utc = (s) => new Date(s + 'T00:00:00Z'), months = monthsInRange();
