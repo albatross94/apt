@@ -901,36 +901,43 @@ function drawCmp(body) {
   sum.append(tbl);
   body.append(sum);
 
-  /* 월별 매매 중간값 그래프 */
-  const g = card('매매 가격 추이', `단지별로 고른 전용면적의 월별 매매 중간값. 점 위에 올리면 단지, 월, 건수가 나옵니다. 거래가 없는 달은 이어 그리지 않습니다.`);
-  body.append(g);
-  const lg = mk('div', null, 'gx-legend'); g.append(lg);
-  const series = sets.map((s, i) => ({
-    key: s.key, i, pts: [...d3.group(s.sale, (t) => t.ym)].map(([mo, v]) => ({ mo, n: v.length, price: d3.median(v, (t) => t.price), key: s.key, i })).sort((a, b) => (a.mo < b.mo ? -1 : 1)),
-  }));
-  series.forEach((s) => { const sp = mk('span'), d = mk('i'); d.style.background = col(s.i); sp.append(d, document.createTextNode(`${cmpName(s.key)} 전용 ${sets[s.i].area}㎡ · ${s.pts.length ? s.pts.length + '개월' : '매매 없음'}`)); lg.append(sp); });
-  const pts = series.flatMap((s) => s.pts);
-  if (!pts.length) { g.append(mk('div', '이 면적의 매매 거래가 없습니다.', 'gx-empty')); return; }
+  /* 월별 중간값 추이 그래프 (매매·전세·월세) */
   const utc = (s) => new Date(s + 'T00:00:00Z'), months = monthsInRange();
-  const first = utc(months[0] + '-01'), last = d3.utcMonth.offset(utc(months.at(-1) + '-01'), 1);
-  const ys = d3.extent(pts, (p) => p.price), pad = (ys[1] - ys[0]) * 0.08 || 1000;
-  const step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
-  const el = plotBox(g);
-  plot(el, pts, {
-    x: d3.scaleUtc().domain([first, last]), y: d3.scaleLinear().domain([ys[0] - pad, ys[1] + pad]).nice(),
-    xv: (p) => utc(p.mo + '-16'), yv: (p) => p.price, color: 'var(--c0)', colorOf: (p) => col(p.i),
-    after: (svg, x, y) => {
-      for (const s of series) {
-        const idx = (p) => months.indexOf(p.mo), segs = []; let cur = [];
-        s.pts.forEach((p, n) => { if (n && idx(p) - idx(s.pts[n - 1]) > 1) { segs.push(cur); cur = []; } cur.push(p); });
-        if (cur.length) segs.push(cur);
-        for (const sg of segs) if (sg.length > 1) svg.append('path').attr('d', d3.line().x((p) => x(utc(p.mo + '-16'))).y((p) => y(p.price))(sg)).attr('fill', 'none').attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('opacity', 0.8).style('stroke', col(s.i));
-      }
-    },
-    xticks: d3.utcMonth.every(el.clientWidth < 520 ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'), yticks: 6, yfmt: (d) => eok(d) + '억',
-    tip: (p) => [`${cmpName(p.key)} ${sets[p.i].area}㎡ · ${ymLabel(p.mo.replace('-', ''))}`, `중간값 ${won(p.price)} · ${p.n}건`],
-  });
-  g.append(mk('p', '한 달에 거래가 1~2건뿐이면 그 달 중간값은 특정 거래에 크게 좌우됩니다. 세로축은 0원에서 시작하지 않으니 눈금의 숫자를 함께 읽어 주세요.', 'gx-note'));
+  const TREND = [
+    { kind: 'sale', title: '매매 가격 추이', name: '매매', what: '거래가', val: (v) => d3.median(v, (t) => t.price), yfmt: (d) => eok(d) + '억', show: (p) => `중간값 ${won(p.v)}` },
+    { kind: 'jeonse', title: '전세 가격 추이', name: '전세', what: '보증금', val: (v) => d3.median(v, (t) => t.price), yfmt: (d) => eok(d) + '억', show: (p) => `보증금 중간값 ${won(p.v)}` },
+    { kind: 'wolse', title: '월세 가격 추이', name: '월세', what: '월세', val: (v) => d3.median(v, (t) => t.rent), yfmt: (d) => `${fmtRent(d)}만`, show: (p) => `월세 중간값 ${fmtRent(p.v)}만원 · 보증금 중간값 ${won(p.dep)}` },
+  ];
+  for (const T of TREND) {
+    const g = card(T.title, `단지별로 고른 전용면적의 월별 ${T.name} ${T.what} 중간값. 점 위에 올리면 단지, 월, 건수가 나옵니다. 거래가 없는 달은 이어 그리지 않습니다.${T.kind === 'wolse' ? ' 월세는 보증금에 따라 크게 달라지므로 툴팁의 보증금 중간값을 함께 보세요.' : ''}`);
+    body.append(g);
+    const lg = mk('div', null, 'gx-legend'); g.append(lg);
+    const series = sets.map((s, i) => ({
+      key: s.key, i, pts: [...d3.group(s[T.kind], (t) => t.ym)].map(([mo, v]) => ({ mo, n: v.length, v: T.val(v), dep: d3.median(v, (t) => t.price), key: s.key, i })).sort((a, b) => (a.mo < b.mo ? -1 : 1)),
+    }));
+    series.forEach((s) => { const sp = mk('span'), d = mk('i'); d.style.background = col(s.i); sp.append(d, document.createTextNode(`${cmpName(s.key)} 전용 ${sets[s.i].area}㎡ · ${s.pts.length ? s.pts.length + '개월' : T.name + ' 없음'}`)); lg.append(sp); });
+    const pts = series.flatMap((s) => s.pts);
+    if (!pts.length) { g.append(mk('div', `이 면적의 ${T.name} 거래가 없습니다.`, 'gx-empty')); continue; }
+    const first = utc(months[0] + '-01'), last = d3.utcMonth.offset(utc(months.at(-1) + '-01'), 1);
+    const ys = d3.extent(pts, (p) => p.v), pad = (ys[1] - ys[0]) * 0.08 || (T.kind === 'wolse' ? 5 : 1000);
+    const step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
+    const el = plotBox(g);
+    plot(el, pts, {
+      x: d3.scaleUtc().domain([first, last]), y: d3.scaleLinear().domain([Math.max(0, ys[0] - pad), ys[1] + pad]).nice(),
+      xv: (p) => utc(p.mo + '-16'), yv: (p) => p.v, color: 'var(--c0)', colorOf: (p) => col(p.i),
+      after: (svg, x, y) => {
+        for (const s of series) {
+          const idx = (p) => months.indexOf(p.mo), segs = []; let cur = [];
+          s.pts.forEach((p, n) => { if (n && idx(p) - idx(s.pts[n - 1]) > 1) { segs.push(cur); cur = []; } cur.push(p); });
+          if (cur.length) segs.push(cur);
+          for (const sg of segs) if (sg.length > 1) svg.append('path').attr('d', d3.line().x((p) => x(utc(p.mo + '-16'))).y((p) => y(p.v))(sg)).attr('fill', 'none').attr('stroke-width', 2).attr('stroke-linejoin', 'round').attr('opacity', 0.8).style('stroke', col(s.i));
+        }
+      },
+      xticks: d3.utcMonth.every(el.clientWidth < 520 ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'), yticks: 6, yfmt: T.yfmt,
+      tip: (p) => [`${cmpName(p.key)} ${sets[p.i].area}㎡ · ${ymLabel(p.mo.replace('-', ''))}`, `${T.show(p)} · ${p.n}건`],
+    });
+    g.append(mk('p', '한 달에 거래가 1~2건뿐이면 그 달 중간값은 특정 거래에 크게 좌우됩니다. 세로축은 이 범위에 맞춰 표시했으니 눈금의 숫자를 함께 읽어 주세요.', 'gx-note'));
+  }
 }
 
 /* ---------- 근거 ---------- */
