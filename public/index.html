@@ -92,6 +92,26 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #gs-tbl th{cursor:pointer;user-select:none}
 .gx-table.num th,.gx-table.num td{text-align:right}
 .gx-table.num th:first-child,.gx-table.num td:first-child{text-align:left}
+.gx-pdf{font:inherit;align-self:flex-start;padding:.55rem 1.2rem;border-radius:9px;border:1px solid var(--color-fg);background:transparent;color:var(--color-fg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
+.gx-printonly{display:none;margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+#pdf-dlg{border:1px solid var(--cds-border);border-radius:var(--cds-radius);background:var(--color-bg);color:var(--color-fg);padding:var(--cds-pad-lg);max-width:min(24rem,calc(100vw - 2rem));font-family:var(--font-sans)}
+#pdf-dlg::backdrop{background:rgba(0,0,0,.4)}
+#pdf-dlg form{display:flex;flex-direction:column;gap:var(--cds-gap-sm)}
+#pdf-dlg h2{margin:0;font-size:var(--cds-font-size-heading)}
+#pdf-dlg input{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.45rem .6rem}
+#pdf-dlg .gx-row{justify-content:flex-end}
+#pdf-dlg button{font:inherit;padding:.45rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
+#pdf-dlg button.sec{background:transparent;color:var(--color-fg)}
+/* 인쇄(PDF)는 항상 밝은 색으로. 조회 조건·탭·버튼은 빼고, 선택 상자는 어떤 값을 골랐는지 보이도록 남긴다 */
+@media print{
+  :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
+    --cds-chart-grid:#e6e9ef;--cds-chart-axis:#aab1bf;--cds-border:#c9cfda;--cds-text-secondary:#5f6878;
+    --c0:#2a5bd7;--c1:#d9531e;--c2:#1c8c6e;--c3:#8a4fd1;--c4:#c29a0d;--c5:#0e8aa8;--c6:#c2417a;--c7:#6b7280;color-scheme:light}
+  .no-print,#tabs,.gx-pdf,.gx-ctrl button,#gs-status{display:none!important}
+  .gx-ctrl{display:flex}
+  .gx-printonly{display:block}
+  .gx-warnbox{background:#fff3dc;border-color:#f0d49a;color:#7a4b00}
+}
 .gx-eyebrow{margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium)}
 </style></head>
 <body><div class="wrap">
@@ -99,7 +119,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 
   <header class="gx-head"><h1 class="gx-title">아파트 실거래가 및 공시가격 조회</h1></header>
 
-  <section class="gx-card gx-ctrl" aria-label="조회 조건">
+  <section class="gx-card gx-ctrl no-print" aria-label="조회 조건">
     <div class="gx-row">
       <label>시군구<select id="region"></select></label>
       <label>거래 종류<select id="kind" style="min-width:6rem"><option value="sale">매매</option><option value="jeonse">전세</option><option value="wolse">월세</option></select></label>
@@ -120,6 +140,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <p class="gx-eyebrow">국토교통부 실거래가 · 리포트</p>
         <h1 id="h-title"></h1>
         <p id="h-sub"></p>
+        <p id="print-meta" class="gx-printonly"></p>
       </header>
 
       <section class="gx-card">
@@ -133,6 +154,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           <button type="button" data-k="gongsi">공시가격</button>
           <button type="button" data-k="cmp">단지비교</button>
         </div>
+        <button type="button" class="gx-pdf" id="pdf-btn">이 탭 PDF로 저장</button>
       </section>
 
       <div class="gx-col" id="tab-body"></div>
@@ -165,6 +187,17 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   </div>
 </div>
 </div>
+
+<dialog id="pdf-dlg">
+  <form id="pdf-form" method="dialog">
+    <h2>PDF로 저장</h2>
+    <label class="gx-note" for="pdf-name">고객 성함</label>
+    <input id="pdf-name" type="text" maxlength="30" autocomplete="off" placeholder="예: 홍길동">
+    <p class="gx-note" id="pdf-file"></p>
+    <p class="gx-note">확인을 누르면 인쇄 창이 열립니다. 대상(프린터)을 <b>PDF로 저장</b>으로 고르세요.</p>
+    <div class="gx-row"><button type="button" class="sec" id="pdf-cancel">취소</button><button type="submit">확인</button></div>
+  </form>
+</dialog>
 
 <script>
 const PY = 3.3058;
@@ -939,6 +972,28 @@ function drawCmp(body) {
     g.append(mk('p', '한 달에 거래가 1~2건뿐이면 그 달 중간값은 특정 거래에 크게 좌우됩니다. 세로축은 이 범위에 맞춰 표시했으니 눈금의 숫자를 함께 읽어 주세요.', 'gx-note'));
   }
 }
+
+/* ---------- PDF 저장 (브라우저 인쇄의 'PDF로 저장' 사용, 파일명: 거래유형_고객명_저장일) ---------- */
+const TAB_NAME = { sale: '매매', jeonse: '전세', wolse: '월세', gongsi: '공시가격', cmp: '단지비교' };
+const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+const safeName = (s) => s.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '').slice(0, 30);
+const pdfFile = (name) => `${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymd(new Date())}`;
+const pdfDlg = $('pdf-dlg');
+let pdfLast = '';
+$('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
+$('pdf-cancel').onclick = () => pdfDlg.close();
+$('pdf-name').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value) + '.pdf' : ''; };
+$('pdf-form').onsubmit = (e) => {
+  e.preventDefault();
+  const name = $('pdf-name').value.trim();
+  if (!safeName(name)) { $('pdf-file').textContent = '고객 성함을 입력해 주세요.'; $('pdf-name').focus(); return; }
+  pdfLast = name; pdfDlg.close();
+  const old = document.title, now = new Date();
+  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name} · 저장일 ${dstr(now)}`;
+  document.title = pdfFile(name);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
+  addEventListener('afterprint', () => { document.title = old; }, { once: true });
+  setTimeout(() => print(), 100);
+};
 
 /* ---------- 근거 ---------- */
 function infoRender() {
