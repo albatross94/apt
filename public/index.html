@@ -175,7 +175,7 @@ const pyeong = (a) => Math.round(a / PY);
 // 매매는 거래가, 전세·월세는 보증금(price)을 기준으로 집계한다. 월세는 rent(만원/월)를 따로 보여준다.
 const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
 const kindOf = (k) => KINDS[k] || KINDS.sale;
-const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, apt: null, aptKey: null, loadInfo: null };
+const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, ask: { sale: {}, jeonse: {}, wolse: {} }, apt: null, aptKey: null, loadInfo: null };
 const LOW = 3;   // 이 건수 미만이면 "표본 적음"
 const med = (a) => (a.length ? d3.median(a, (r) => r.price) : null);
 
@@ -412,6 +412,7 @@ function render() {
   const body = $('tab-body'); body.replaceChildren();
   const rows = D[tab].filter((t) => t.area === pick);
   ({ sale: saleBody, jeonse: jeonseBody, wolse: wolseBody })[tab](body, rows);
+  askCard(body, rows, tab);
   tradeList(body, inBand(rows));   // 목록은 그래프에 쓴 거래와 같게 맞춘다
   infoRender();
 }
@@ -597,6 +598,62 @@ function tradeList(body, rows) {
   const tbl = mkTable(['계약일', '동', '층', sale ? '거래가(만원)' : '보증금(만원)', ...(wolse ? ['월세(만원)'] : []), sale ? '거래 방식' : '계약구분', '상태'],
     list.map((r) => [r.date, r.dong, String(r.floor), fmt(r.price), ...(wolse ? [fmt(r.rent)] : []), r.gbn || '—', '정상']), [0, 1]);
   k.append(tbl); body.append(k);
+}
+
+/* ---------- 현재 호가와 실거래 비교 (호가는 사용자가 직접 입력) ---------- */
+// 입력값은 state.ask에만 두고, 탭·면적을 바꿔도 남긴다. 저장하거나 서버로 보내지 않는다.
+function askCard(body, rows, tab) {
+  const A = state.ask[tab];   // 거래 종류마다 따로 기억한다(매매 호가가 월세 보증금 칸에 남지 않게)
+  const wolse = tab === 'wolse', KN = KNAME[tab], PN = tab === 'sale' ? '거래가' : '보증금';
+  const k = card(`현재 호가와 실거래 비교 · ${KN}`, '매물 호가는 실제 계약가격이 아닙니다. 호가를 직접 입력하면 같은 단지·위에서 고른 전용면적의 최근 실거래와 비교합니다. 호가 자료는 이 앱이 수집하지 않으며, 입력한 값은 저장·전송되지 않고 이 화면에서만 쓰입니다.');
+  const out = mk('div', null, 'gx-rblk');
+  const field = (key, label, attrs) => {
+    const l = mk('label', label), i = mk('input'); Object.assign(i, attrs); i.value = A[key] ?? '';
+    i.addEventListener('input', () => { A[key] = i.value; upd(); });
+    l.append(i); return l;
+  };
+  const row = mk('div', null, 'gx-row');
+  row.append(field('price', (wolse ? '보증금' : KN) + ' 호가(만원)', { type: 'number', min: 0, step: 100, placeholder: '예: 125000' }));
+  if (wolse) row.append(field('rent', '월세 호가(만원)', { type: 'number', min: 0, step: 1, placeholder: '예: 80' }));
+  row.append(field('floor', '층(선택)', { type: 'number', min: 1, step: 1 }),
+    field('src', '호가 출처', { type: 'text', placeholder: '예: ○○부동산 매물' }),
+    field('date', '호가 기준일', { type: 'date' }));
+  const ctrl = mk('div', null, 'gx-ctrl'); ctrl.append(row);
+  k.append(ctrl, out); body.append(k);
+
+  function upd() {
+    const months = monthsInRange(), cut = months.length > 6 ? months[months.length - 6] : months[0];
+    const rec = rows.filter((t) => t.ym >= cut), recOk = rec.length >= LOW, use = recOk ? rec : rows;
+    const basis = recOk ? `최근 6개월(${cut.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec.length}건뿐)`;
+    out.replaceChildren();
+    if (!use.length) { out.append(mk('p', '이 전용면적은 조회 기간에 거래가 없어 비교할 수 없습니다.', 'gx-note')); return; }
+    const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price);
+    const a = { price: '', rent: '', floor: '', src: '', date: '', ...A }, price = parseFloat(a.price), rent = parseFloat(a.rent), floor = parseInt(a.floor, 10);
+    const pairs = [['비교 기준', `같은 단지 · 전용 ${state.pick}㎡ · ${basis} ${KN} 거래 ${use.length}건`], ['실거래 중간값', won(mdn)], ['실거래 범위', `${won(lo)} ~ ${won(hi)}`]];
+    if (wolse) pairs.splice(2, 0, ['실거래 월세 중간값', `${fmtRent(d3.median(use, (t) => t.rent))}만원`]);
+    const kv = mkKv(pairs);
+    if (use.length < LOW) kv.children[1].append(mk('span', '표본 적음', 'gx-badge'));
+    out.append(kv);
+    if (!(price > 0)) { out.append(mk('p', `${wolse ? '보증금' : KN} 호가를 입력하면 차액과 비율, 유사 거래와의 비교가 나옵니다.`, 'gx-note')); return; }
+    const sgn = (v) => (v >= 0 ? '+' : '−');
+    const diff = price - mdn, pct = diff / mdn;
+    const res = [['입력한 호가', won(price) + (floor > 0 ? ` · ${floor}층` : '')],
+      [`호가 − 실거래 중간값`, `${diff === 0 ? '0원' : sgn(diff) + won(Math.abs(diff))} (${d3.format('+.2%')(pct)})`],
+      ['호가의 위치', `비교 거래 ${use.length}건 중 ${use.filter((t) => t.price < price).length}건보다 높고 ${use.filter((t) => t.price > price).length}건보다 낮음`],
+      ['호가 출처·기준일', `${a.src.trim() || '출처 미입력'} · ${a.date || '기준일 미입력'}`]];
+    if (wolse && a.rent !== '' && rent >= 0) {
+      const rm = d3.median(use, (t) => t.rent);
+      res.splice(2, 0, ['월세 호가 − 실거래 월세 중간값', `${sgn(rent - rm)}${fmtRent(Math.abs(rent - rm))}만원 (호가 ${fmt(rent)}만원 / 중간값 ${fmtRent(rm)}만원)`]);
+    }
+    const kv2 = mkKv(res); kv2.style.marginTop = '.6rem'; out.append(kv2);
+    const sim = [...use].sort((x, y) => (floor > 0 ? Math.abs(x.floor - floor) - Math.abs(y.floor - floor) : 0) || (x.date < y.date ? 1 : -1)).slice(0, 8);
+    out.append(mk('p', `유사 거래 ${sim.length}건 (${floor > 0 ? '입력한 층과 가까운 순, 같은 층이면 최근순' : '최근순'}) — 층·거래 시점이 다르면 가격이 달라질 수 있습니다.`, 'gx-note'));
+    out.append(mkTable(['계약일', '층', ...(floor > 0 ? ['층 차이'] : []), `${PN}(만원)`, ...(wolse ? ['월세(만원)'] : []), '호가 대비'],
+      sim.map((t) => [t.date, String(t.floor), ...(floor > 0 ? [`${t.floor - floor >= 0 ? '+' : ''}${t.floor - floor}`] : []), fmt(t.price), ...(wolse ? [fmt(t.rent)] : []),
+        `${sgn(price - t.price)}${fmt(Math.abs(price - t.price))}`]), [0]));
+    out.append(mk('p', '호가는 매도·임대인이 부르는 가격이고 실거래가는 실제 체결 가격입니다. 둘의 차이가 곧 적정가격이나 협상 가능 금액을 뜻하지는 않습니다.', 'gx-note'));
+  }
+  upd();
 }
 
 /* ---------- 동·호별 공시가격 (V-World, 서버 /api/gongsi) ---------- */
