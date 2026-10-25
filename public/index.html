@@ -206,6 +206,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <h2>PDF로 저장</h2>
     <label class="gx-note" for="pdf-name">고객 성함</label>
     <input id="pdf-name" type="text" maxlength="30" autocomplete="off" placeholder="예: 홍길동">
+    <label class="gx-note" for="pdf-tel">고객 연락처 (선택)</label>
+    <input id="pdf-tel" type="tel" maxlength="30" autocomplete="off" placeholder="예: 010-1234-5678">
     <p class="gx-note" id="pdf-file"></p>
     <p class="gx-note">확인을 누르면 인쇄 창이 열립니다. 대상(프린터)을 <b>PDF로 저장</b>으로 고르세요.</p>
     <div class="gx-row"><button type="button" class="sec" id="pdf-cancel">취소</button><button type="submit">확인</button></div>
@@ -1026,17 +1028,18 @@ const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0'
 const safeName = (s) => s.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '').slice(0, 30);
 const pdfFile = (name) => `${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymd(new Date())}`;
 const pdfDlg = $('pdf-dlg');
-let pdfLast = '';
-$('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
+let pdfLast = '', pdfTel = '';
+$('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
 $('pdf-cancel').onclick = () => pdfDlg.close();
 $('pdf-name').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value) + '.pdf' : ''; };
 $('pdf-form').onsubmit = (e) => {
   e.preventDefault();
   const name = $('pdf-name').value.trim();
   if (!safeName(name)) { $('pdf-file').textContent = '고객 성함을 입력해 주세요.'; $('pdf-name').focus(); return; }
-  pdfLast = name; pdfDlg.close();
+  const tel = $('pdf-tel').value.trim();
+  pdfLast = name; pdfTel = tel; pdfDlg.close();
   const old = document.title, now = new Date();
-  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name} · 저장일 ${dstr(now)}`;
+  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name}${tel ? ' · 연락처 ' + tel : ''} · 저장일 ${dstr(now)}`;
   document.title = pdfFile(name);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
   addEventListener('afterprint', () => { document.title = old; }, { once: true });
   setTimeout(() => print(), 100);
