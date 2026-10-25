@@ -1061,12 +1061,13 @@ const aptTag = () => {
   const names = state.tab === 'cmp' ? cmp.keys.map((k) => k.split('|')[1]) : [state.apt];
   return names.filter(Boolean).join('+').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '').slice(0, 60) || '단지';
 };
-const pdfFile = (name) => `${aptTag()}_${areaTag()}_${TAB_NAME[state.tab]}_${safeName(name) || '고객'}_${ymdhm(new Date())}`;
+// 연락처는 입력했을 때만 고객명 다음에 붙인다
+const pdfFile = (name, tel = '') => [aptTag(), areaTag(), TAB_NAME[state.tab], safeName(name) || '고객', safeName(tel), ymdhm(new Date())].filter(Boolean).join('_');
 const pdfDlg = $('pdf-dlg');
 let pdfLast = '', pdfTel = '';
 $('pdf-btn').onclick = () => { $('pdf-name').value = pdfLast; $('pdf-tel').value = pdfTel; $('pdf-file').textContent = ''; pdfDlg.showModal(); $('pdf-name').focus(); };
 $('pdf-cancel').onclick = () => pdfDlg.close();
-$('pdf-name').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value) + '.pdf' : ''; };
+$('pdf-name').oninput = $('pdf-tel').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value, $('pdf-tel').value) + '.pdf' : ''; };
 $('pdf-form').onsubmit = (e) => {
   e.preventDefault();
   const name = $('pdf-name').value.trim();
@@ -1074,8 +1075,8 @@ $('pdf-form').onsubmit = (e) => {
   const tel = $('pdf-tel').value.trim();
   pdfLast = name; pdfTel = tel; pdfDlg.close();
   const old = document.title, now = new Date();
-  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 고객 ${name}${tel ? ' · 연락처 ' + tel : ''} · 저장일시 ${dtstr(now)}`;
-  document.title = pdfFile(name);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
+  $('print-meta').textContent = `${TAB_NAME[state.tab]} 리포트 · 저장일시 ${dtstr(now)}`;
+  document.title = pdfFile(name, tel);   // 인쇄 창의 기본 파일명이 문서 제목을 따른다
   addEventListener('afterprint', () => { document.title = old; }, { once: true });
   setTimeout(() => print(), 100);
 };
