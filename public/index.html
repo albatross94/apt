@@ -90,6 +90,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   <section class="gx-card gx-ctrl" aria-label="조회 조건">
     <div class="gx-row">
       <label>시군구<select id="region"></select></label>
+      <label>거래 종류<select id="kind" style="min-width:6rem"><option value="sale">매매</option><option value="jeonse">전세</option><option value="wolse">월세</option></select></label>
     </div>
     <div class="gx-row">
       <label>시작월<select id="from"></select></label>
@@ -119,7 +120,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           <span class="gx-lab">지표</span>
           <label class="gx-hint gx-inline" style="display:inline-flex">
             <select id="c-metric" style="font:inherit;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.25rem .5rem">
-              <option value="price">거래가(만원)</option><option value="ppy">전용 평당가(만원)</option>
+              <option value="price">거래가·보증금(만원)</option><option value="ppy">전용 평당가(만원)</option>
             </select></label>
         </div>
         <section class="gx-card">
@@ -240,7 +241,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       </section>
 
 
-      <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 해제(취소) 거래는 제외했고, 평형은 전용면적을 기준으로 묶었습니다.</p>
+      <p class="gx-foot">출처: 국토교통부 실거래가 공개시스템(계약일 기준, 신고 후 변경·해제될 수 있음). 매매는 해제(취소) 거래를 제외했고, 평형은 전용면적을 기준으로 묶었습니다. 전세·월세는 보증금을 기준으로 집계하며, 월세가 있는 계약은 월세, 없는 계약은 전세로 나눴습니다.</p>
     </div>
   </div>
 </div></div>
@@ -256,7 +257,10 @@ const won = (v) => { const e = Math.floor(v / 10000), m = Math.round(v % 10000);
 const col = (i) => `var(--c${i % 8})`;
 const pyeong = (a) => Math.round(a / PY);
 
-const state = { view: 'detail', cmp: [], regions: [], raw: [], from: '', to: '', trades: [], sizes: [], pick: ALL, apt: null };
+// 매매는 거래가, 전세·월세는 보증금(price)을 기준으로 집계한다. 월세는 rent(만원/월)를 따로 보여준다.
+const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
+const kindOf = (k) => KINDS[k] || KINDS.sale;
+const state = { view: 'detail', kind: 'sale', cmp: [], regions: [], raw: [], from: '', to: '', trades: [], sizes: [], pick: ALL, apt: null };
 
 /* ---------- 조회 조건 ---------- */
 const sel = $('region');
@@ -290,10 +294,11 @@ $('go').onclick = async () => {
   try {
     const from = $('from').value, to = $('to').value;
     if (from > to) throw new Error('시작월이 종료월보다 늦습니다.');
-    const trades = await loadTrades(sel.value, from, to, (d, n) => { st.textContent = `불러오는 중… ${d}/${n}개월`; });
-    state.from = from; state.to = to; state.lawd = sel.value;
+    const kind = $('kind').value;
+    const trades = await loadTrades(sel.value, from, to, (d, n) => { st.textContent = `불러오는 중… ${d}/${n}개월`; }, kind);
+    state.from = from; state.to = to; state.lawd = sel.value; state.kind = kind;
     state.raw = trades.filter((t) => !t.canceled);
-    st.textContent = `거래 ${state.raw.length.toLocaleString()}건 (해제 제외)`;
+    st.textContent = `${kindOf(kind).name} 거래 ${state.raw.length.toLocaleString()}건` + (kind === 'sale' ? ' (해제 제외)' : '');
     buildAptOptions();
   } catch (e) { st.className = 'err'; st.textContent = e.message; }
   btn.disabled = false;
@@ -354,7 +359,8 @@ function selectApt() {
   const dongs = d3.rollups(state.trades, (v) => v.length, (t) => t.dong).sort((a, b) => b[1] - a[1]);
   state.apt = t0.apt;
   $('h-title').textContent = t0.apt;
-  $('h-sub').textContent = `${reg.sido} ${reg.name} ${dongs[0][0]} · 아파트 매매 · 전용면적(평형)별 · 단위 만원 · 해제(취소) 거래 제외 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)}`;
+  const K = kindOf(state.kind);
+  $('h-sub').textContent = `${reg.sido} ${reg.name} ${dongs[0][0]} · 아파트 ${K.name}${state.kind === 'sale' ? '' : ' (' + K.price + ' 기준)'} · 전용면적(평형)별 · 단위 만원${state.kind === 'sale' ? ' · 해제(취소) 거래 제외' : ''} ·${ymLabel(state.from)} ~ ${ymLabel(state.to)}`;
 
   const chips = $('chips-pick');
   chips.replaceChildren();
@@ -468,12 +474,14 @@ function render() {
     const t = document.createElement('div'); t.className = 'gx-tile' + (pick === s.label ? ' gx-on' : '');
     t.innerHTML = `<div class="gx-k">전용 ${s.label} · 약 ${s.py}평</div>
       <div class="gx-v">${aa == null ? '—' : fmt(Math.round(aa))}<small>만원</small></div>
-      <div class="gx-d">${endY - 1}년 대비 ${aa && bb ? d3.format('+.1%')(aa / bb - 1) : '—'} · ${endY}년 ${a.length}건</div>`;
+      <div class="gx-d">${endY - 1}년 대비 ${aa && bb ? d3.format('+.1%')(aa / bb - 1) : '—'} · ${endY}년 ${a.length}건</div>`
+      + (state.kind === 'wolse' && a.length ? `<div class="gx-d">평균 월세 ${fmt(Math.round(d3.mean(a, (r) => r.rent)))}만원</div>` : '');
     t.addEventListener('click', () => { state.pick = s.label; render(); });
     return t;
   }));
 
-  q('#h-monthly').textContent = '월별 평균 거래가 · ' + where;
+  const PN = kindOf(state.kind).price;
+  q('#h-monthly').textContent = `월별 평균 ${PN} · ` + where;
   q('#h-year').textContent = '월별·연도별 비교 · ' + where;
   q('#note-mix').hidden = pick !== ALL;
 
@@ -511,7 +519,7 @@ function render() {
 
   // 차트 3: 연도별 평균가 막대
   const e3 = q('#chart-bars');
-  q('#h-bars').textContent = pick === ALL ? '연도·평형별 평균가' : '연도별 평균가 · ' + where;
+  q('#h-bars').textContent = pick === ALL ? `연도·평형별 평균 ${PN}` : `연도별 평균 ${PN} · ` + where;
   q('#note-bars').textContent = pick === ALL ? '평형마다 연도별 평균을 나란히 놓았습니다. 막대 위에 올리면 건수가 나와요.' : '고른 평형의 연도별 평균입니다. 막대 위 숫자는 억 단위예요.';
   e3.replaceChildren();
   const yrRows = d3.rollups(trades, (v) => ({ avg: avg(v), n: v.length, min: d3.min(v, (r) => r.price), max: d3.max(v, (r) => r.price) }),
@@ -595,9 +603,12 @@ function render() {
   // 거래 내역
   const list = [...sub].sort((a, b) => (a.date < b.date ? 1 : -1));
   q('#note-list').textContent = `${where} · ${list.length.toLocaleString()}건 · 최근 거래순`;
+  const wolse = state.kind === 'wolse';
+  q('#tlist thead tr').replaceChildren(...['계약일', '평형', '전용(㎡)', '층', `${PN}(만원)`, ...(wolse ? ['월세(만원)'] : []), state.kind === 'sale' ? '유형' : '계약구분']
+    .map((t) => { const th = document.createElement('th'); th.textContent = t; return th; }));
   q('#tlist tbody').replaceChildren(...list.slice(0, 500).map((r) => {
     const tr = document.createElement('tr');
-    [r.date, r.size, r.area, r.floor, fmt(r.price), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
+    [r.date, r.size, r.area, r.floor, fmt(r.price), ...(wolse ? [fmt(r.rent)] : []), r.gbn].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.append(td); });
     return tr;
   }));
 }
@@ -605,7 +616,8 @@ function render() {
 /* ---------- 실거래가 불러오기 ---------- */
 // 한 달씩 나눠 4개씩 동시에 요청한다. 서버리스 함수의 실행 시간 제한을 피하고, 달마다 결과가 공유 캐시(CDN)에 쌓인다.
 // lawd: 시군구 5자리, from/to: YYYYMM → 거래 배열(해제 포함). onProgress(완료 수, 전체 수)
-async function loadTrades(lawd, from, to, onProgress) {
+// kind: 'sale'(매매) | 'jeonse'(전세) | 'wolse'(월세). 전월세 API는 둘을 함께 주므로 월세 유무로 나눈다.
+async function loadTrades(lawd, from, to, onProgress, kind = 'sale') {
   const months = monthsInRange(from, to).map((m) => m.replace('-', ''));
   if (months.length > 36) throw new Error('조회 기간은 최대 36개월입니다.');
   const out = new Array(months.length);
@@ -613,7 +625,7 @@ async function loadTrades(lawd, from, to, onProgress) {
   const worker = async () => {
     while (next < months.length) {
       const i = next++;
-      const r = await fetch('/api/trades?' + new URLSearchParams({ lawd, ym: months[i] }));
+      const r = await fetch('/api/trades?' + new URLSearchParams({ lawd, ym: months[i], ...(kind === 'sale' ? {} : { type: 'rent' }) }));
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
       out[i] = j.trades;
@@ -621,7 +633,8 @@ async function loadTrades(lawd, from, to, onProgress) {
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, months.length) }, worker));
-  return out.flat();
+  const all = out.flat();
+  return kind === 'jeonse' ? all.filter((t) => !t.rent) : kind === 'wolse' ? all.filter((t) => t.rent > 0) : all;
 }
 
 /* ---------- 단지 비교 ---------- */
@@ -653,11 +666,11 @@ $('addCmp').onclick = () => {
   if (!state.trades.length) return;
   const reg = state.regions.find((r) => r.code === state.lawd) || { name: '' };
   const t0 = state.trades[0];
-  const id = state.lawd + '|' + aptKey(t0);
+  const id = state.kind + '|' + state.lawd + '|' + aptKey(t0);
   st.className = '';
   if (state.cmp.some((e) => e.id === id)) { st.textContent = '이미 비교 목록에 있습니다.'; return; }
   if (state.cmp.length >= 8) { st.className = 'err'; st.textContent = '비교는 최대 8개 단지까지 가능합니다.'; return; }
-  const entry = { id, lawd: state.lawd, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes };
+  const entry = { id, kind: state.kind, lawd: state.lawd, key: aptKey(t0), apt: t0.apt, dong: t0.dong, regionName: reg.name, from: state.from, to: state.to, trades: state.trades, sizes: state.sizes };
   entry.pick = defaultPick(entry, state.cmp);
   state.cmp.push(entry);
   saveCmp();
@@ -669,7 +682,7 @@ $('addCmp').onclick = () => {
 const CMP_KEY = 'aptCompareList.v1';
 function saveCmp() {
   try {
-    localStorage.setItem(CMP_KEY, JSON.stringify(state.cmp.map(({ id, lawd, key, apt, dong, regionName, from, to, pick }) => ({ id, lawd, key, apt, dong, regionName, from, to, pick }))));
+    localStorage.setItem(CMP_KEY, JSON.stringify(state.cmp.map(({ id, kind, lawd, key, apt, dong, regionName, from, to, pick }) => ({ id, kind, lawd, key, apt, dong, regionName, from, to, pick }))));
   } catch {}
 }
 async function restoreCmp() {
@@ -682,13 +695,14 @@ async function restoreCmp() {
   const failed = [];
   for (const m of saved.slice(0, 8)) {
     try {
-      const ck = [m.lawd, m.from, m.to].join('|');
+      const kind = m.kind || 'sale';   // 전월세 추가 전에 저장된 목록은 매매
+      const ck = [kind, m.lawd, m.from, m.to].join('|');
       if (!cache.has(ck)) {
-        cache.set(ck, (await loadTrades(m.lawd, m.from, m.to)).filter((t) => !t.canceled));
+        cache.set(ck, (await loadTrades(m.lawd, m.from, m.to, null, kind)).filter((t) => !t.canceled));
       }
       const trades = prepTrades(cache.get(ck), m.key);
       if (!trades.length) throw new Error('거래 없음');
-      const entry = { ...m, trades, sizes: buildSizes(trades) };
+      const entry = { ...m, id: m.id.startsWith(kind + '|') ? m.id : kind + '|' + m.id, kind, trades, sizes: buildSizes(trades) };
       // 저장된 평형이 없거나 데이터 갱신으로 사라졌으면 기본값
       if (entry.pick !== ALL && !entry.sizes.some((s) => s.label === entry.pick)) entry.pick = defaultPick(entry, state.cmp);
       state.cmp.push(entry);
@@ -714,18 +728,20 @@ function renderCompare() {
   const vfmt = metric === 'price' ? won : (v) => fmt(Math.round(v)) + '만원';
   const yfmt = metric === 'price' ? (d) => eok(d) + '억' : (d) => fmt(Math.round(d));
   const avgV = (rows) => (rows.length ? d3.mean(rows, val) : null);
-  const mname = metric === 'price' ? '거래가' : '전용 평당가';
+  const kinds = new Set(E.map((e) => e.kind || 'sale'));
+  const pname = kinds.size === 1 ? kindOf([...kinds][0]).price : '거래가·보증금';
+  const mname = metric === 'price' ? pname : '전용 평당가';
 
   // 단지별로 고른 평형이 유효한지 확인 (없으면 기본값)
   for (const e of E) if (e.pick !== ALL && !e.sizes.some((s) => s.label === e.pick)) e.pick = defaultPick(e, E.filter((o) => o !== e));
   const rowsOf = (e) => (e.pick === ALL ? e.trades : e.trades.filter((t) => t.size === e.pick));
-  const name = (e) => `${e.apt} (${e.dong})`;
-  const pickName = (e) => (e.pick === ALL ? '전체' : e.pick);
+  const name = (e) => `${e.apt} (${e.dong})` + (e.kind && e.kind !== 'sale' ? ` [${kindOf(e.kind).name}]` : '');
+  const pickName =(e) => (e.pick === ALL ? '전체' : e.pick);
   const label = (e) => `${name(e)} · ${pickName(e)}`;
   const picks = new Set(E.map((e) => e.pick));
   const where = picks.size === 1 ? (E[0].pick === ALL ? '전체 평형' : '전용 ' + E[0].pick) : '단지별 평형';
 
-  $('c-sub').textContent = `${E.length}개 단지 · ${where} · ${mname} 기준 · 단위 만원 · 해제(취소) 거래 제외`;
+  $('c-sub').textContent = `${E.length}개 단지 · ${where} · ${mname} 기준 · 단위 만원${kinds.has('sale') ? ' · 매매는 해제(취소) 거래 제외' : ''}`;
 
   // 단지별 행: 평형 드롭다운 + 제거
   const ca = $('c-apts'); ca.replaceChildren();
@@ -826,9 +842,10 @@ function buildDetailWb() {
 
   XLSX.utils.book_append_sheet(wb, xlSheet(
     [...trades].sort((a, b) => (a.date < b.date ? 1 : -1)).map((t) => ({
-      '계약일': t.date, '평형': t.size, '전용면적(㎡)': t.area, '층': t.floor, '거래금액(만원)': t.price,
-      '전용 평당가(만원)': ppy(t), '거래유형': t.gbn, '법정동': t.dong, '지번': t.jibun, '준공년도': t.built,
-    })), [12, 9, 12, 6, 14, 16, 10, 10, 10, 10]), '거래내역');
+      '계약일': t.date, '평형': t.size, '전용면적(㎡)': t.area, '층': t.floor, [`${kindOf(state.kind).price}(만원)`]: t.price,
+      ...(state.kind === 'wolse' ? { '월세(만원)': t.rent } : {}),
+      '전용 평당가(만원)': ppy(t), [state.kind === 'sale' ? '거래유형' : '계약구분']: t.gbn, '법정동': t.dong, '지번': t.jibun, '준공년도': t.built,
+    })), [12, 9, 12, 6, 14, 14, 16, 10, 10, 10, 10]), '거래내역');
 
   const summ = (size, year, v) => ({ '평형': size, '연도': year, '건수': v.length, '평균(만원)': avgInt(v), '최저(만원)': d3.min(v, (r) => r.price), '최고(만원)': d3.max(v, (r) => r.price) });
   const ys = [];
@@ -855,7 +872,7 @@ function buildCompareWb() {
   const val = (t) => (metric === 'price' ? t.price : ppy(t));
   const mname = metric === 'price' ? '거래가(만원)' : '전용 평당가(만원)';
   const rowsOf = (e) => (e.pick === ALL ? e.trades : e.trades.filter((t) => t.size === e.pick));
-  const name = (e) => `${e.apt} (${e.dong})`;
+  const name = (e) => `${e.apt} (${e.dong})` + (e.kind && e.kind !== 'sale' ? ` [${kindOf(e.kind).name}]` : '');
   const colName = (e) => `${name(e)} · ${e.pick === ALL ? '전체' : e.pick}`;
   const from = E.map((e) => e.from).sort()[0], to = E.map((e) => e.to).sort().at(-1);
   const months = monthsInRange(from, to);
@@ -883,8 +900,8 @@ function buildCompareWb() {
   XLSX.utils.book_append_sheet(wb, xlSheet(
     E.flatMap((e) => e.trades.map((t) => ({ e, t }))).sort((a, b) => (a.t.date < b.t.date ? 1 : -1)).map(({ e, t }) => ({
       '단지': name(e), '지역': e.regionName, '계약일': t.date, '평형': t.size, '전용면적(㎡)': t.area, '층': t.floor,
-      '거래금액(만원)': t.price, '전용 평당가(만원)': ppy(t), '거래유형': t.gbn,
-    })), [30, 14, 12, 9, 12, 6, 14, 16, 10]), '거래내역');
+      '거래금액·보증금(만원)': t.price, '월세(만원)': t.rent, '전용 평당가(만원)': ppy(t), '거래유형': t.gbn,
+    })), [30, 14, 12, 9, 12, 6, 18, 12, 16, 10]), '거래내역');
   return wb;
 }
 
@@ -896,7 +913,7 @@ const xlGuard = (fn) => () => {
 };
 $('xl-detail').onclick = xlGuard(() => {
   if (!state.trades.length) return;
-  xlSave(buildDetailWb(), `${state.apt}_실거래가_${state.from}-${state.to}`);
+  xlSave(buildDetailWb(), `${state.apt}_${kindOf(state.kind).name}실거래가_${state.from}-${state.to}`);
 });
 $('xl-cmp').onclick = xlGuard(() => {
   if (!state.cmp.length) return;

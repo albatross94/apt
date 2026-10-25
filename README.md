@@ -14,7 +14,7 @@
 ## 준비물
 
 - [Node.js](https://nodejs.org) 18 이상
-- 공공데이터포털([data.go.kr](https://www.data.go.kr)) 인증키: "국토교통부_아파트 매매 실거래가 자료"를 검색해 활용신청한 뒤, 마이페이지에서 **일반 인증키**를 복사 (활용신청 직후에는 반영까지 시간이 걸릴 수 있음)
+- 공공데이터포털([data.go.kr](https://www.data.go.kr)) 인증키: "국토교통부_아파트 매매 실거래가 자료"와 (전세·월세용) "국토교통부_아파트 전월세 실거래가 자료"를 검색해 각각 활용신청한 뒤, 마이페이지에서 **일반 인증키**를 복사 (활용신청 직후에는 반영까지 시간이 걸릴 수 있음)
 - (공시가격을 쓰려면) [V-World](https://www.vworld.kr) 인증키: 마이포털의 인증키 관리에서 발급받고, 활용 API에 국가중점데이터(NED) API가 포함되도록 신청
 
 ## 실행 방법
@@ -47,6 +47,7 @@
    | 이름 | 값 | 용도 |
    |---|---|---|
    | `SERVICE_KEY` | 공공데이터포털 인증키 | 실거래가 |
+   | `RENT_SERVICE_KEY` | (선택) 전월세 API 전용 인증키. 없으면 `SERVICE_KEY` 사용 | 전세·월세 |
    | `VWORLD_KEY` | V-World 인증키 | 동·호별 공시가격 (선택) |
 
 3. **Deploy** 합니다. 키를 나중에 바꾸면 환경 변수를 수정한 뒤 다시 배포해야 적용됩니다.
@@ -69,7 +70,7 @@ CLI로 하려면 `npm i -g vercel` 후 `vercel`(미리보기) / `vercel --prod`(
    └── public/index.html ◀─────┘  결과 캐시: 로컬은 cache/, Vercel은 CDN
 ```
 
-- 호출하는 API는 `RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`(기본 API)입니다.
+- 호출하는 API는 `RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`(매매)와 `RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(전월세, `type=rent`)입니다. 전세·월세는 월세 유무로 나눕니다.
 - 한 달 치를 지역 코드(`LAWD_CD`)별로 페이지를 넘기며 모두 받아 `cache/지역코드_YYYYMM.json`에 저장합니다. 지난 달은 영구 캐시, 이번 달은 1시간만 캐시합니다.
 - 해제(취소)된 거래는 분석에서 제외합니다.
 - 공시가격은 선택한 단지의 시도·시군구·법정동·지번으로 V-World 주소 검색에서 필지번호(PNU)를 얻고, 그 PNU로 `getApartHousingPriceAttr`를 호출해 가져옵니다. 연도별 결과는 `cache/`에 저장되며, 올해 자료는 7일, 지난 연도는 영구 캐시합니다.
