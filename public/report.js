@@ -101,7 +101,7 @@ function evidence(D){
   var row=function(a,b){return '<span style="font-weight:700;color:#423f3d">'+a+'</span><span>'+esc(b)+'</span>'};
   return '<div style="background:#fff;padding:12px 24px 16px 24px;display:flex;flex-direction:column;gap:8px">'+h2('이 자료를 믿고 보실 수 있는 근거')+
   '<div style="display:grid;grid-template-columns:76px minmax(0,1fr);column-gap:12px;row-gap:2px;font-size:13px;line-height:20px">'+row('출처',D.src)+row('조회 조건',D.cond)+row('자료 기준',D.basis)+row('가공 방법',proc)+'</div>'+
-  '<div style="border-top:1px solid #cbc8c1;padding-top:8px;display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:20px"><span>· 평균이 아니라 중간값을 썼습니다. 한두 건의 특이한 거래에 숫자가 끌려가지 않게 하기 위해서입니다.</span><span>· 계약 후 30일 이내에 신고하는 제도라서, 최근 계약일의 거래는 아직 올라오지 않았을 수 있습니다.</span><span>· 같은 면적이라도 동, 층, 향, 수리 상태에 따라 가격이 다릅니다.</span><span>· 이 정보는 법적 효력이 없는 참고용이며, 본 자료는 계약일 기준 자체 집계로, 공식 통계와 다를 수 있습니다.</span></div></div>';
+  '<div style="border-top:1px solid #cbc8c1;padding-top:8px;display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:20px"><span>· 평균이 아니라 중간값을 썼습니다. 한두 건의 특이한 거래에 숫자가 끌려가지 않게 하기 위해서입니다.</span><span>· 계약 후 30일 이내에 신고하는 제도라서, 최근 계약일의 거래는 아직 올라오지 않았을 수 있습니다.</span><span>· 같은 면적이라도 동, 층, 향, 수리 상태에 따라 가격이 다릅니다.</span><span>· 이 정보는 법적 효력이 없는 참고용이며, 본 자료는 제공(저장)일 기준 자체 집계로, 공식 통계와 다를 수 있습니다.</span></div></div>';
 }
 
 /* 점 모양: 저층=회색 원, 중층=빨강 사각, 고층=노랑 삼각. 속이 빈 점은 갱신 계약 */
