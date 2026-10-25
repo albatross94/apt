@@ -198,6 +198,14 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
         <p class="gx-note" id="meta-scatter"></p>
       </section>
 
+      <section class="gx-card" id="sec-ratio" hidden>
+        <h2 id="h-ratio">전세가율 추이</h2>
+        <p class="gx-note" id="note-ratio"></p>
+        <div class="gx-legend" id="legend-ratio"></div>
+        <div class="gx-plot"><div class="gx-chart gx-short" id="chart-ratio"></div><div class="gx-tip"></div></div>
+        <p class="gx-note" id="meta-ratio"></p>
+      </section>
+
       <section class="gx-card">
         <h2 id="h-monthly">월별 평균 거래가</h2>
         <p class="gx-note">그 달에 거래된 가격의 평균입니다. 점 위에 올리면 건수가 나와요. 거래가 없는 달은 이어 그리지 않습니다.</p>
@@ -494,6 +502,7 @@ function render() {
   q('#note-mix').hidden = pick !== ALL;
 
   scatterChart(sub, months, where);
+  ratioChart(months);
 
   // 차트 1: 월별 평균 (평형별 선)
   const e1 = q('#chart-all');
@@ -687,6 +696,66 @@ function scatterChart(sub, months, where) {
   q('#meta-scatter').textContent = `표본 ${fmt(pts.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중위 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))}`
     + (recent.length ? ` · 최근 6개월 ${recent.length}건 중위 ${won(d3.median(recent, (p) => p.y))}` : '')
     + ` · 출처 국토교통부 실거래가 공개시스템(계약일 기준), 조회 ${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}`;
+}
+
+/* ---------- 전세가율 추이 (같은 단지·같은 평형의 전세 중위 보증금 ÷ 매매 중위가) ---------- */
+// 반대쪽 거래(매매 조회면 전세, 전세 조회면 매매)를 같은 지역·기간으로 한 번 더 불러와 짝을 맞춘다.
+// 거래가 드문 단지가 많아 한 달 값 대신 최근 3개월을 묶어 중위값을 쓰고, 양쪽 모두 2건 이상일 때만 계산한다.
+const otherRows = new Map(), otherLoading = new Set();
+function ratioChart(months) {
+  const sec = $('sec-ratio');
+  sec.hidden = state.kind === 'wolse';
+  if (sec.hidden) return;
+  const other = state.kind === 'sale' ? 'jeonse' : 'sale';
+  const key = [other, state.lawd, state.from, state.to].join('|');
+  const el = q('#chart-ratio'), note = q('#note-ratio');
+  const aptK = aptKey(state.trades[0]);
+  const stillHere = () => state.trades.length && aptKey(state.trades[0]) === aptK;
+  if (!otherRows.has(key)) {
+    el.replaceChildren(); q('#legend-ratio').replaceChildren(); q('#meta-ratio').textContent = '';
+    if (otherLoading.has(key)) return;
+    note.textContent = `같은 단지의 ${kindOf(other).name} 거래를 불러오는 중…`;
+    otherLoading.add(key);
+    loadTrades(state.lawd, state.from, state.to, null, other).then((r) => {
+      otherRows.set(key, r.filter((t) => !t.canceled)); otherLoading.delete(key);
+      if (stillHere()) ratioChart(monthsInRange());
+    }, () => { otherLoading.delete(key); if (stillHere()) note.textContent = `${kindOf(other).name} 거래를 불러오지 못했습니다. 다시 조회해 주세요.`; });
+    return;
+  }
+  const sizes = state.sizes;
+  const tag = (t) => { const z = sizes.find((c) => t.area >= c.lo - 1.5 && t.area <= c.hi + 1.5); return z ? z.label : null; };
+  const oth = prepTrades(otherRows.get(key), aptK).map((t) => ({ ...t, size: tag(t) })).filter((t) => t.size);
+  const sale = state.kind === 'sale' ? state.trades : oth, jeon = state.kind === 'sale' ? oth : state.trades;
+  const W = 3, MINN = 2;
+  const idx = (mo) => +mo.slice(0, 4) * 12 + +mo.slice(5, 7);
+  const parse = (s) => new Date(s + '-01T00:00:00Z');
+  const series = sizes.filter((z) => state.pick === ALL || z.label === state.pick).map((z) => ({
+    name: z.label, color: col(sizes.indexOf(z)),
+    pts: months.map((mo) => {
+      const inWin = (t) => t.size === z.label && idx(mo) - idx(t.ym) >= 0 && idx(mo) - idx(t.ym) < W;
+      const s = sale.filter(inWin), j = jeon.filter(inWin);
+      return s.length >= MINN && j.length >= MINN
+        ? { x: parse(mo), y: d3.median(j, (r) => r.price) / d3.median(s, (r) => r.price) * 100, n: s.length + j.length, ns: s.length, nj: j.length, ym: mo } : null;
+    }).filter(Boolean),
+  })).filter((s) => s.pts.length);
+  q('#h-ratio').textContent = '전세가율 추이 · ' + (state.pick === ALL ? '전체 평형' : '전용 ' + state.pick);
+  if (!series.length) {
+    el.innerHTML = '<div class="gx-empty">전세와 매매가 모두 2건 이상 잡힌 구간이 없어 전세가율을 계산하지 못했습니다.<br>조회 기간을 늘려 보세요.</div>';
+    q('#legend-ratio').replaceChildren(); q('#meta-ratio').textContent = ''; note.textContent = ''; return;
+  }
+  const narrow = el.clientWidth < 520, step = months.length > 30 ? 6 : months.length > 14 ? 3 : 1;
+  lineChart(el, {
+    series, h: 260, end: true,
+    x: d3.scaleUtc().domain([parse(months[0]), parse(months.at(-1))]),
+    xticks: d3.utcMonth.every(narrow ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'),
+    gap: (a, b) => (b.x - a.x) / 2592000000 > 1.5,
+    yfmt: (d) => d + '%', valfmt: (v) => v.toFixed(1) + '%',
+    tipTitle: (p) => `${p.ym.replace('-', '년 ')}월 기준 · 매매 ${p.ns}건·전세 ${p.nj}건`,
+  });
+  legend(q('#legend-ratio'), series.map((s) => ({ name: '전용 ' + s.name, color: s.color })));
+  note.textContent = `전세가율 = 전세 중위 보증금 ÷ 매매 중위가. 각 달을 포함한 최근 ${W}개월 거래를 묶어 계산하고, 매매·전세가 각각 ${MINN}건 이상일 때만 표시합니다. 비율이 높을수록 매매가 대비 보증금이 커서 보증금 안전 여유가 작다는 뜻이며, 선순위 대출 등 권리관계는 반영하지 않습니다.`;
+  q('#meta-ratio').textContent = '최근 ' + series.map((s) => { const l = s.pts.at(-1); return `${s.name} ${l.y.toFixed(1)}% (${l.ym.replace('-', '.')}, 매매 ${l.ns}·전세 ${l.nj}건)`; }).join(' · ')
+    + ' · 출처 국토교통부 실거래가 공개시스템(계약일 기준)';
 }
 
 /* ---------- 실거래가 불러오기 ---------- */
