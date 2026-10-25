@@ -433,7 +433,8 @@ function selectApt() {
   state.trades = prepTrades(state.raw, key);
   state.sizes = buildSizes(state.trades);
   resetGongsi();
-  state.pick = ALL;
+  // '전체' 칩이 없으므로 가장 많이 거래된 평형을 기본으로 선택
+  state.pick = d3.greatest(d3.rollups(state.trades, (v) => v.length, (t) => t.size), (d) => d[1])[0];
   const t0 = state.trades[0];
   const reg = state.regions.find((r) => r.code === sel.value) || { sido: '', name: '' };
   const dongs = d3.rollups(state.trades, (v) => v.length, (t) => t.dong).sort((a, b) => b[1] - a[1]);
@@ -444,7 +445,7 @@ function selectApt() {
 
   const chips = $('chips-pick');
   chips.replaceChildren();
-  [ALL, ...state.sizes.map((s) => s.label)].forEach((s) => {
+  state.sizes.map((s) => s.label).forEach((s) => {
     const b = document.createElement('button'); b.type = 'button'; b.dataset.size = s;
     const i = document.createElement('i');
     i.style.background = s === ALL ? 'var(--color-fg-muted)' : col(state.sizes.findIndex((z) => z.label === s));
