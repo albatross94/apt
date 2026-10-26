@@ -1400,35 +1400,45 @@ function openPopup(c, pos, size) {
   const btns = mk('div');
   btns.style.cssText = 'display:flex;gap:6px;margin-top:8px';
   btns.append(go, shut);
-  // 토지이용계획: 버튼을 누르면 이 단지 필지의 용도지역·지구·구역을 불러와 펼친다(한 번 불러오면 다시 묻지 않는다)
-  const lu = mk('button', '토지이용계획 보기'), luBox = mk('div');
+  // 토지이용계획: 버튼을 누르면 별도 팝업에 이 단지 필지의 용도지역·지구·구역을 보여 준다(한 번 불러오면 다시 묻지 않는다)
+  const lu = mk('button', '토지이용계획 보기');
   lu.type = 'button'; lu.className = 'sec'; lu.style.cssText = 'width:100%;margin-top:8px';
-  luBox.style.cssText = 'max-height:160px;overflow:auto;margin-top:6px;font-size:12px';
-  luBox.hidden = true;
-  let luDone = false;
+  let luData = null;
   lu.addEventListener('click', async () => {
-    luBox.hidden = !luBox.hidden;
-    lu.textContent = luBox.hidden ? '토지이용계획 보기' : '토지이용계획 접기';
-    if (luBox.hidden || luDone) return;
-    if (!c.jibun) { luBox.textContent = '지번 정보가 없어 필지를 찾을 수 없습니다.'; return; }
-    luBox.textContent = '불러오는 중…';
-    const reg = regOf();
+    const dlg = mk('dialog'), body = mk('div'), bar = mk('div', null), shutLu = mk('button', '닫기');
+    dlg.style.cssText = 'width:min(26rem,calc(100vw - 2rem));max-height:80vh;padding:16px;border:1px solid var(--color-border-line);border-radius:12px;background:var(--color-panel);color:var(--color-fg);font:400 13px/1.5 var(--font-sans)';
+    body.style.cssText = 'overflow:auto;max-height:calc(80vh - 90px);margin:10px 0';
+    bar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px';
+    shutLu.type = 'button'; shutLu.className = 'sec'; shutLu.style.cssText = 'display:block;margin-left:auto';
+    const ttl = mk('b', `${c.apt} 토지이용계획`);
+    ttl.style.fontSize = '15px';
+    bar.append(ttl);
+    dlg.append(bar, body, shutLu);
+    const close = () => dlg.close();
+    shutLu.addEventListener('click', close);
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });   // 바깥(배경)을 누르면 닫는다
+    dlg.addEventListener('close', () => dlg.remove());
+    document.body.append(dlg); dlg.showModal();
+    if (!c.jibun) { body.textContent = '지번 정보가 없어 필지를 찾을 수 없습니다.'; return; }
     try {
-      const r = await fetch('/api/landuse?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error);
-      luDone = true;
+      if (!luData) {
+        body.textContent = '불러오는 중…';
+        const reg = regOf();
+        const r = await fetch('/api/landuse?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error);
+        luData = j;
+      }
+      const j = luData, note = (t) => { const d = mk('div', t); d.style.cssText = 'color:var(--color-fg-muted);margin-top:6px'; return d; };
       const parts = ['포함', '저촉', '접함'].map((k) => [k, j.items.filter((x) => x[1] === k).map((x) => x[0])]).filter(([, v]) => v.length);
-      luBox.replaceChildren(mk('div', `${j.address}${j.updated ? ' · ' + j.updated + ' 기준' : ''}`), ...parts.map(([k, v]) => {
-        const d = mk('div', null), b = mk('b', k + ' ');
-        d.style.cssText = 'margin-top:4px'; d.append(b, document.createTextNode(v.join(', ')));
+      body.replaceChildren(note(`${j.address}${j.updated ? ' · ' + j.updated + ' 기준' : ''}`), ...parts.map(([k, v]) => {
+        const d = mk('div'), b = mk('b', k + ' ');
+        d.style.cssText = 'margin-top:8px'; d.append(b, document.createTextNode(v.join(', ')));
         return d;
-      }), mk('div', '포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
-      luBox.lastChild.style.cssText = 'margin-top:6px;color:var(--color-fg-muted)';
-      luBox.firstChild.style.color = 'var(--color-fg-muted)';
-    } catch (e) { luBox.textContent = '토지이용계획을 불러오지 못했습니다: ' + e.message; }
+      }), note('포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
+    } catch (e) { body.textContent = '토지이용계획을 불러오지 못했습니다: ' + e.message; }
   });
-  card.append(head, sub, list, lu, luBox, btns); wrap.append(card);
+  card.append(head, sub, list, lu, btns); wrap.append(card);
   const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
   kmap.popupKey = c.key;
 
