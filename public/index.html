@@ -144,6 +144,28 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #pdf-dlg .gx-row{justify-content:flex-end}
 #pdf-dlg button{font:inherit;padding:.45rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 #pdf-dlg button.sec{background:transparent;color:var(--color-fg)}
+/* 화면 전체를 분석리포트(PDF) 양식 색·모양으로: 베이지 바탕, 흰 카드, 진홍 강조, 각진 모서리, 그림자 없음. 다크 모드는 쓰지 않는다 */
+:root{--color-bg:#e6d9ce;--color-fg:#202227;--color-fg-muted:#423f3d;--color-panel:#ffffff;--color-border-line:#cbc8c1;--color-bad:#8e1b1c;
+--cds-chart-grid:#d8d2c8;--cds-chart-muted:#b3aea6;--cds-chart-axis:#8a857d;--cds-surface-popover:#ffffff;--cds-border:#b9b4ab;--cds-shadow-popover:none;--cds-text-secondary:#423f3d;--cds-radius:0;
+--font-sans:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+--c0:#8e1b1c;--c1:#2f6f8f;--c2:#2e7d6b;--c3:#5b4b8a;--c4:#b8960b;--c5:#d9531e;--c6:#c2417a;--c7:#6b6560;color-scheme:light}
+.gx-warnbox{background:#fff3dc;border-color:#f0d49a;color:#7a4b00}
+.gx-head h1{font-weight:900}
+.gx-card h2{display:flex;align-items:center;gap:8px;font-size:1.25rem;font-weight:700}
+.gx-card h2::before{content:"";width:8px;height:20px;background:#8e1b1c;flex:none}
+.gx-card{border:0}
+.gx-ctrl select,.gx-ctrl input,.gx-ctrl button,.gx-pill,.gx-areas button,.gx-seg,.gx-seg button,.gx-warnbox,#pdf-dlg input,#pdf-dlg button,#pdf-dlg fieldset,.gx-login input,.gx-login button,.gx-pdf,.gx-legend button{border-radius:0}
+.gx-ctrl button,#pdf-dlg button,.gx-login button{background:#8e1b1c;border-color:#8e1b1c;color:#fff}
+.gx-ctrl button.sec,#pdf-dlg button.sec{background:transparent;color:#8e1b1c}
+.gx-pdf{border-color:#8e1b1c;color:#8e1b1c}
+.gx-areas button[aria-pressed="true"]{border-color:#8e1b1c;background:#e6d9ce}
+.gx-seg{background:#cbc8c1}
+.gx-seg button[aria-pressed="true"]{background:#8e1b1c;color:#fff;box-shadow:none}
+.gx-chips button[aria-pressed="true"]{background:#fff}
+.gx-stat .v{font-weight:800}
+#map-box,#map-lp{border-radius:0}
+#map-ul .rk{background:#8e1b1c;color:#fff}
+#map-search input,#map-search button,#map-smsg,#map-full{box-shadow:none}
 /* 인쇄(PDF)는 항상 밝은 색으로. 조회 조건·탭·버튼은 빼고, 선택 상자는 어떤 값을 골랐는지 보이도록 남긴다 */
 /* 브라우저가 붙이는 머리글·바닥글(날짜, 파일명)은 @page 여백을 0으로 두면 나오지 않는다.
    대신 쪽마다 위아래 여백이 있도록, 반복되는 머리·바닥 표 그룹(.pf-h/.pf-f)에 빈 칸을 둔다 */
@@ -165,9 +187,9 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   .pf{display:table;width:100%}
   .pf-h{display:table-header-group}.pf-b{display:table-row-group}.pf-f{display:table-footer-group}
   .pf .sp{height:12mm}
-  :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
-    --cds-chart-grid:#e6e9ef;--cds-chart-axis:#aab1bf;--cds-border:#c9cfda;--cds-text-secondary:#5f6878;
-    --c0:#2a5bd7;--c1:#d9531e;--c2:#1c8c6e;--c3:#8a4fd1;--c4:#c29a0d;--c5:#0e8aa8;--c6:#c2417a;--c7:#6b7280;color-scheme:light}
+  :root{--color-bg:#e6d9ce;--color-fg:#202227;--color-fg-muted:#423f3d;--color-panel:#ffffff;--color-border-line:#cbc8c1;--color-bad:#8e1b1c;
+    --cds-chart-grid:#d8d2c8;--cds-chart-axis:#8a857d;--cds-border:#b9b4ab;--cds-text-secondary:#423f3d;
+    --c0:#8e1b1c;--c1:#2f6f8f;--c2:#2e7d6b;--c3:#5b4b8a;--c4:#b8960b;--c5:#d9531e;--c6:#c2417a;--c7:#6b6560;color-scheme:light}
   .no-print,#tabs,.gx-pdf,.gx-ctrl button,#gs-status{display:none!important}
   .gx-ctrl{display:flex}
   .gx-printonly{display:block}
@@ -1346,7 +1368,7 @@ function openPopup(c, pos, size) {
   closePopup();
   const wrap = mk('div'), card = mk('div');
   wrap.style.cssText = `padding-bottom:${Math.round(size / 2) + 8}px`;   // 원과 겹치지 않게 위로 띄운다
-  card.style.cssText = 'width:290px;box-sizing:border-box;padding:10px 12px;border-radius:10px;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--color-border-line);font:400 13px/1.45 var(--font-sans)';
+  card.style.cssText = 'width:290px;box-sizing:border-box;padding:10px 12px;border-radius:0;background:var(--color-panel);color:var(--color-fg);border:1px solid var(--color-border-line);font:400 13px/1.45 var(--font-sans)';
   const head = mk('div'), ttl = mk('b', c.apt), x = mk('button', '×');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:8px';
   x.type = 'button'; x.title = '닫기';
