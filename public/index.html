@@ -1567,7 +1567,9 @@ function drawList() {
   const ul = $('map-ul');
   if (!kmap.all) { ul.replaceChildren(); $('map-lh').textContent = ''; return; }
   const q = normQ($('map-q').value);
-  const rows = kmap.all.map((c, rank) => ({ c, rank })).filter(({ c }) => !q || normQ(`${c.apt}${c.dong}`).includes(q));
+  // 검색어가 없으면 지도에 표시한 상위 단지(선택한 단지 포함)만, 있으면 전체에서 찾는다
+  const lim = Number($('map-top').value);
+  const rows = kmap.all.map((c, rank) => ({ c, rank })).filter(({ c, rank }) => q ? normQ(`${c.apt}${c.dong}`).includes(q) : rank < lim || kmap.sel === c.key);
   $('map-lh').textContent = `${KNAME[$('kind').value]} 거래량 순 · ${rows.length}개 단지`;
   ul.replaceChildren(...rows.map(({ c, rank }) => {
     const li = mk('li'), rk = mk('span', String(rank + 1), 'rk'), nm = mk('span', c.apt, 'nm'), ct = mk('span', `${c.n}건`, 'ct');
