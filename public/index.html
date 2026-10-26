@@ -1334,7 +1334,7 @@ function setFull(on) {
 $('map-full').onclick = () => setFull(!$('map-wrap').classList.contains('full'));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFull(false); });
 
-function closePopup() { if (kmap.popup) { kmap.popup.setMap(null); kmap.popup = null; } }
+function closePopup() { if (kmap.popup) { kmap.popup.setMap(null); kmap.popup = null; kmap.popupKey = null; } }
 
 // 단지를 누르면 매매·전세·월세 탭별로 전용면적별 거래 건수를 팝업으로 보여 준다
 // (지도 원은 조회한 종류 하나만 세므로, 나머지 종류는 같은 지역·기간으로 불러와 합친다)
@@ -1354,10 +1354,17 @@ function openPopup(c, pos, size) {
   list.style.cssText = 'max-height:200px;overflow:auto';
   const go = mk('button', '이 단지 리포트 보기');
   go.type = 'button'; go.className = 'sec';
-  go.style.cssText = 'margin-top:8px;width:100%';
+  go.style.cssText = 'flex:1';
   go.addEventListener('click', () => { closePopup(); setFull(false); $('apt').value = c.key; selectApt(); $('dash').scrollIntoView({ behavior: 'smooth' }); });
-  card.append(head, sub, list, go); wrap.append(card);
+  const shut = mk('button', '닫기');
+  shut.type = 'button'; shut.className = 'sec';
+  shut.addEventListener('click', closePopup);
+  const btns = mk('div');
+  btns.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+  btns.append(go, shut);
+  card.append(head, sub, list, btns); wrap.append(card);
   const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
+  kmap.popupKey = c.key;
 
   const KINDS3 = ['sale', 'jeonse', 'wolse'];
   Promise.all(KINDS3.map(kindRows)).then((rows) => {
@@ -1453,7 +1460,7 @@ function drawBubble(c, rank) {
   el.title = `${c.apt} (${c.dong}) · ${c.n}건`;
   el.style.cssText = `position:relative;width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;background:${bg};color:${fg};`
     + `opacity:${rank < 10 ? 0.95 : 0.55 + 0.4 * c.n / kmap.all[0].n};font:700 12px/1 var(--font-sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);padding:0`;
-  el.addEventListener('click', () => openPopup(c, pos, size));
+  el.addEventListener('click', () => { if (kmap.popupKey === c.key) closePopup(); else openPopup(c, pos, size); });   // 열려 있는 단지의 원을 다시 누르면 닫는다
   if (rank < 10) {   // 1~10위는 순위 배지와 "N위 단지명"을 함께 보여 준다
     const bd = mk('span', String(rank + 1));
     bd.style.cssText = 'position:absolute;top:-8px;left:-8px;min-width:20px;height:20px;box-sizing:border-box;border-radius:10px;padding:0 5px;background:#1d2330;color:#fff;border:2px solid #fff;font:800 11px/16px var(--font-sans);text-align:center';
