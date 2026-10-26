@@ -1349,6 +1349,18 @@ function openPopup(c, pos, size) {
   x.style.cssText = 'border:0;background:none;color:var(--color-fg-muted);font-size:18px;line-height:1;cursor:pointer;padding:0';
   x.addEventListener('click', closePopup);
   head.append(ttl, x);
+  // 제목줄을 끌어 팝업을 옮긴다 (위치는 transform으로만 바꿔 지도 이동에도 따라온다)
+  let dx = 0, dy = 0;
+  head.style.cursor = 'move'; head.style.touchAction = 'none';
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target === x || e.button > 0) return;
+    e.stopPropagation();
+    const sx = e.clientX - dx, sy = e.clientY - dy;
+    head.setPointerCapture(e.pointerId);
+    const move = (m) => { dx = m.clientX - sx; dy = m.clientY - sy; wrap.style.transform = `translate(${dx}px,${dy}px)`; };
+    const up = () => { head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); };
+    head.addEventListener('pointermove', move); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
+  });
   const sub = mk('div', `${c.dong} · 거래 건수를 불러오는 중…`), list = mk('div');
   sub.style.cssText = 'color:var(--color-fg-muted);font-size:12px;margin-bottom:6px';
   list.style.cssText = 'max-height:200px;overflow:auto';
