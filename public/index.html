@@ -529,7 +529,7 @@ const mmdd = (s) => s.slice(5).replace('-', '.');
 const mkd = (name) => document.querySelector(name);
 
 let selToken = 0;
-async function selectApt() {
+async function selectApt(want) {   // want: {area, tab} — 지도 팝업에서 누른 면적·종류로 바로 연다
   const key = $('apt').value;
   if (!key) return;
   const tk = ++selToken, st = $('status'), prev = st.textContent;
@@ -550,6 +550,10 @@ async function selectApt() {
   state.areas = [...new Set(all.map((t) => t.area))].sort(NUM);
   const base = D[state.tab].length ? D[state.tab] : all;
   state.pick = d3.greatest(d3.rollups(base, (v) => v.length, (t) => t.area), (d) => d[1])[0];
+  if (want && want.area && state.areas.includes(want.area)) {
+    state.pick = want.area;
+    if (want.tab) { state.tab = want.tab; if (KINDS[want.tab]) $('kind').value = want.tab; }
+  }
   const t0 = all[0], dong = d3.greatest(d3.rollups(all, (v) => v.length, (t) => t.dong), (d) => d[1])[0];
   const built = (all.find((t) => t.built) || {}).built;
   state.apt = t0.apt; state.dong = dong; state.built = built;
@@ -1406,6 +1410,8 @@ function openPopup(c, pos, size) {
         avg.style.cssText = 'position:relative;font-size:12px;color:var(--color-fg-muted)';
         top.style.cssText = 'position:relative;display:flex;justify-content:space-between;gap:8px';
         row.style.cssText = 'position:relative;padding:3px 6px;border-radius:4px;overflow:hidden';
+        row.style.cursor = 'pointer'; row.title = '누르면 이 면적의 리포트로 이동합니다';
+        row.addEventListener('click', () => { closePopup(); setFull(false); $('apt').value = c.key; selectApt({ area: a, tab: KINDS3[k] }); $('dash').scrollIntoView({ behavior: 'smooth' }); });
         top.append(lab, cnt); row.append(top, avg); return row;
       }));
       if (!items.length) list.append(mk('div', `${KNAME[KINDS3[k]]} 거래가 없습니다.`));
