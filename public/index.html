@@ -1211,12 +1211,23 @@ $('pdf-form').onsubmit = async (e) => {
 };
 
 /* ---------- 분석리포트(A4) PDF: 앱 상태로 데이터를 만들고 public/report.js의 양식에 넣는다 ---------- */
+// 리포트 머리에 넣을 세대수·주차대수. 단지 상세 API에서 불러오고, 못 불러오면 null(그 줄은 빠진다)
+async function loadPark() {
+  try {
+    const r = await fetch('/api/aptdetail?' + new URLSearchParams({ sgg: state.lawd, dong: state.dong, apt: state.apt }));
+    if (!r.ok) return null;
+    const { base: b, dtl: t } = await r.json(), num = (x) => Number(x) || 0;
+    return { hh: num(b.kaptdaCnt) || num(b.hoCnt), dongs: num(b.kaptDongCnt), ground: num(t.kaptdPcnt), under: num(t.kaptdPcntu) };
+  } catch { return null; }
+}
+
 async function saveReportPdf(name, tel) {
   if (!window.html2canvas || !window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
   const co = { name: $('pdf-co-name').value.trim(), sub: $('pdf-co-sub').value.trim(), rep: $('pdf-co-rep').value.trim(), addr: $('pdf-co-addr').value.trim(), reg: $('pdf-co-reg').value.trim(), tel: $('pdf-co-tel').value.trim() };
   try { localStorage.setItem(CO_KEY, JSON.stringify(co)); } catch {}
   Report.setConfig(co);
   const D = buildReportData();
+  D.park = await loadPark();
   const stage = mk('div', null, 'rpt-stage');
   stage.innerHTML = Report.build(D).join('');
   document.body.append(stage);

@@ -79,6 +79,17 @@ function summary(D){
   return '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px"><div style="background:#dfc10e;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:8px">'+yel+'</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">'+cells.join('')+'</div></div>';
 }
 
+// 단지 개요 한 줄(총 세대수·동 수·주차대수). 단지 상세 자료를 못 불러왔으면 넣지 않는다
+function parkLine(D){
+  var k=D.park;if(!k)return '';
+  var n=function(v){return (+v).toLocaleString('en-US')},tot=k.ground+k.under,parts=[];
+  if(k.hh)parts.push('총 '+n(k.hh)+'세대');
+  if(k.dongs)parts.push(k.dongs+'개 동');
+  if(tot){var d=[];if(k.ground)d.push('지상 '+n(k.ground));if(k.under)d.push('지하 '+n(k.under));
+    parts.push('주차 '+n(tot)+'대('+d.join('·')+(k.hh?', 세대당 '+(tot/k.hh).toFixed(2)+'대':'')+')')}
+  return parts.length?'<span style="font-size:14px;line-height:20px;font-weight:700">'+esc(parts.join(' · '))+'</span>':'';
+}
+
 function page1(D,N){
   var meta=D.cust?[['고객',D.cust.name],['연락처',D.cust.phone],['저장일시',D.saved],['조회 기간',D.period]]:[['저장일시',D.saved],['조회 기간',D.period],['가장 최근 계약일',D.latest||'—'],['기준',D.type==='매매'?'계약일 · 해제 제외':'계약일 기준']];
   var maxN=Math.max.apply(null,D.areas.map(function(z){return z.n}))||1;
@@ -86,8 +97,8 @@ function page1(D,N){
     return '<div style="display:grid;grid-template-columns:158px 72px 56px minmax(0,1fr);column-gap:12px;align-items:center;padding:1px 0;'+(last?'':'border-bottom:1px solid #cbc8c1;')+(sel?'background:#e6d9ce;font-weight:800;':'')+'font-size:14px;line-height:22px"><span>'+esc(z.a)+'㎡'+(sel?' ◀ 이 리포트':'')+'</span><span>약 '+z.py+'평</span><span style="text-align:right">'+z.n+'건</span><span style="display:block;height:10px">'+(z.n?'<span style="display:block;height:10px;width:'+w.toFixed(1)+'%;'+(sel?'background:#8e1b1c':'background:#423f3d;opacity:0.6')+'"></span>':'')+'</span></div>'}).join('');
   var rl=readLines(D).map(function(t){return '<div style="font-size:14px;line-height:22px">'+t+'</div>'}).join('');
   return '<div class="pg">'+
-  '<div style="background:#8e1b1c;color:#fff;padding:24px 40px;display:flex;flex-direction:column;gap:20px"><div style="display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><div style="display:flex;flex-direction:column"><span style="font-size:20px;line-height:24px;font-weight:900">'+esc(CFG.name)+'</span><span style="font-size:13px;line-height:18px;font-weight:500">'+esc(subLine())+'</span></div></div>'+(CFG.tel?'<div style="border:2px solid #fff;border-radius:999px;padding:4px 20px;font-size:20px;line-height:28px;font-weight:800">T. '+esc(CFG.tel)+'</div>':'')+'</div>'+
-  '<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;line-height:20px;font-weight:700">국토교통부 실거래가 공개자료 기반 분석 리포트</span><h1 style="margin:0;font-size:48px;line-height:54px;font-weight:900">'+esc(D.complex)+'</h1><span style="font-size:16px;line-height:26px;font-weight:400">'+esc(D.addr)+(D.built?' · '+esc(D.built)+'년 준공':'')+' · 전용 '+esc(D.sel.a)+'㎡ (약 '+D.sel.py+'평)</span></div></div>'+
+  '<div style="background:#8e1b1c;color:#fff;padding:16px 40px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><div style="display:flex;flex-direction:column"><span style="font-size:20px;line-height:24px;font-weight:900">'+esc(CFG.name)+'</span><span style="font-size:13px;line-height:18px;font-weight:500">'+esc(subLine())+'</span></div></div>'+(CFG.tel?'<div style="border:2px solid #fff;border-radius:999px;padding:4px 20px;font-size:20px;line-height:28px;font-weight:800">T. '+esc(CFG.tel)+'</div>':'')+'</div>'+
+  '<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;line-height:20px;font-weight:700">국토교통부 실거래가 공개자료 기반 분석 리포트</span><h1 style="margin:0;font-size:48px;line-height:54px;font-weight:900">'+esc(D.complex)+'</h1><span style="font-size:16px;line-height:26px;font-weight:400">'+esc(D.addr)+(D.built?' · '+esc(D.built)+'년 준공':'')+' · 전용 '+esc(D.sel.a)+'㎡ (약 '+D.sel.py+'평)</span>'+parkLine(D)+'</div></div>'+
   '<div style="'+BODY+'">'+
   '<div style="background:#fff;padding:12px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:16px">'+meta.map(function(z){return lab(z[0],z[1])}).join('')+'</div>'+
   '<div style="display:flex;flex-direction:column;gap:8px">'+h2('핵심 요약 · 전용 '+D.sel.a+'㎡ '+D.type)+summary(D)+'</div>'+
