@@ -1531,6 +1531,21 @@ function openPopup(c, pos, size) {
     ].filter(Boolean);
     body.replaceChildren(note(`공동주택 단지 목록과 맞춘 이름: ${d.matched}${areaRows.length ? ` · 전용면적별 세대수는 공시가격 ${g.year}년 자료 기준` : ''}`), ...parts,
       note('출처 국토교통부 공동주택 기본·상세정보(공공데이터포털). 단지에 따라 비어 있는 항목은 보이지 않습니다.'));
+
+    // 공용관리비: 가장 최근 공개된 달의 항목별 합계. 호출이 17번이라 조금 걸려서, 위 내용을 먼저 보여 주고 카드만 따로 채운다.
+    const feeCard = mk('div', null, 'ds');
+    feeCard.append(mk('h3', '공용관리비'), mk('div', '불러오는 중…'));
+    body.insertBefore(feeCard, body.lastChild);
+    fetch('/api/aptfee?' + new URLSearchParams({ code: d.code })).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); return j; }).then((f) => {
+      if (!f.ym) { feeCard.lastChild.textContent = '최근 공개된 공용관리비 자료가 없습니다.'; return; }
+      const area = num(b.kaptMarea), perHh = hh ? Math.round(f.total / hh) : 0, perM2 = area ? Math.round(f.total / area) : 0;
+      const fee = sec('공용관리비', [
+        ['기준월', `${f.ym.slice(0, 4)}.${f.ym.slice(4)}`], ['월 합계', won(f.total / 10000)], ['세대당 월', perHh ? `${perHh.toLocaleString()}원` : ''], ['㎡당 월', perM2 ? `${perM2.toLocaleString()}원` : ''],
+        ...[...f.items].sort((x, y) => y[1] - x[1]).map(([k, v]) => [k, won(v / 10000)]),
+      ]);
+      feeCard.replaceWith(fee);
+      fee.append(note('공용관리비만 포함한 값입니다. 난방·전기·수도 등 개별사용료는 세대마다 달라 넣지 않았습니다. 공개가 한두 달 늦습니다. (출처 국토교통부 공동주택관리비 정보, 한국부동산원 K-apt)'));
+    }).catch((e) => { feeCard.lastChild.textContent = `관리비를 불러오지 못했습니다: ${e.message}`; });
   }));
   btns.append(info, lu, go, shut);
   card.append(head, sub, list, btns); wrap.append(card);
