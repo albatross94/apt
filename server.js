@@ -18,7 +18,7 @@ try {
 const core = require('./lib/core');
 const auth = require('./lib/auth');
 
-const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/config': 'config' };
+const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/landuse': 'landuse','/api/config': 'config' };
 const AUTH_ROUTES = { '/api/login': 'login', '/api/logout': 'logout', '/api/me': 'me' };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 

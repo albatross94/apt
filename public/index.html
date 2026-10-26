@@ -1400,7 +1400,35 @@ function openPopup(c, pos, size) {
   const btns = mk('div');
   btns.style.cssText = 'display:flex;gap:6px;margin-top:8px';
   btns.append(go, shut);
-  card.append(head, sub, list, btns); wrap.append(card);
+  // 토지이용계획: 버튼을 누르면 이 단지 필지의 용도지역·지구·구역을 불러와 펼친다(한 번 불러오면 다시 묻지 않는다)
+  const lu = mk('button', '토지이용계획 보기'), luBox = mk('div');
+  lu.type = 'button'; lu.className = 'sec'; lu.style.cssText = 'width:100%;margin-top:8px';
+  luBox.style.cssText = 'max-height:160px;overflow:auto;margin-top:6px;font-size:12px';
+  luBox.hidden = true;
+  let luDone = false;
+  lu.addEventListener('click', async () => {
+    luBox.hidden = !luBox.hidden;
+    lu.textContent = luBox.hidden ? '토지이용계획 보기' : '토지이용계획 접기';
+    if (luBox.hidden || luDone) return;
+    if (!c.jibun) { luBox.textContent = '지번 정보가 없어 필지를 찾을 수 없습니다.'; return; }
+    luBox.textContent = '불러오는 중…';
+    const reg = regOf();
+    try {
+      const r = await fetch('/api/landuse?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      luDone = true;
+      const parts = ['포함', '저촉', '접함'].map((k) => [k, j.items.filter((x) => x[1] === k).map((x) => x[0])]).filter(([, v]) => v.length);
+      luBox.replaceChildren(mk('div', `${j.address}${j.updated ? ' · ' + j.updated + ' 기준' : ''}`), ...parts.map(([k, v]) => {
+        const d = mk('div', null), b = mk('b', k + ' ');
+        d.style.cssText = 'margin-top:4px'; d.append(b, document.createTextNode(v.join(', ')));
+        return d;
+      }), mk('div', '포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
+      luBox.lastChild.style.cssText = 'margin-top:6px;color:var(--color-fg-muted)';
+      luBox.firstChild.style.color = 'var(--color-fg-muted)';
+    } catch (e) { luBox.textContent = '토지이용계획을 불러오지 못했습니다: ' + e.message; }
+  });
+  card.append(head, sub, list, lu, luBox, btns); wrap.append(card);
   const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
   kmap.popupKey = c.key;
 
