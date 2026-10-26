@@ -1239,7 +1239,20 @@ async function loadPark() {
     const r = await fetch('/api/aptdetail?' + new URLSearchParams({ sgg: state.lawd, dong: state.dong, apt: state.apt }));
     if (!r.ok) return null;
     const { base: b, dtl: t } = await r.json(), num = (x) => Number(x) || 0;
-    return { hh: num(b.kaptdaCnt) || num(b.hoCnt), dongs: num(b.kaptDongCnt), ground: num(t.kaptdPcnt), under: num(t.kaptdPcntu) };
+    // 전용면적별 세대수: 단지 정보 팝업과 같이 공시가격 자료의 동·호를 센 값(지번이 없거나 못 불러오면 생략)
+    let areas = [];
+    try {
+      const reg = state.regions.find((x) => x.code === state.lawd) || { sido: '', name: '' }, t0 = state.gt;
+      if (t0 && t0.jibun) {
+        const rr = await fetch('/api/aptinfo?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, t0.dong, t0.jibun].filter(Boolean).join(' ') }));
+        if (rr.ok) {
+          const g = await rr.json(), nk = (x) => x.replace(/\s+/g, '');
+          const grp = g.groups.find((q) => nk(q.name).includes(nk(state.apt)) || nk(state.apt).includes(nk(q.name))) || (g.groups.length === 1 ? g.groups[0] : null);
+          if (grp) areas = grp.areas;
+        }
+      }
+    } catch {}
+    return { hh: num(b.kaptdaCnt) || num(b.hoCnt), dongs: num(b.kaptDongCnt), ground: num(t.kaptdPcnt), under: num(t.kaptdPcntu), areas };
   } catch { return null; }
 }
 
