@@ -1410,53 +1410,100 @@ function openPopup(c, pos, size) {
   list.style.cssText = 'max-height:200px;overflow:auto;touch-action:pan-y';   // 터치로는 목록을 스크롤한다
   const go = mk('button', '이 단지 리포트 보기');
   go.type = 'button'; go.className = 'sec';
-  go.style.cssText = 'grid-column:1;grid-row:2';
+  go.style.cssText = 'grid-column:1;grid-row:3';
   go.addEventListener('click', () => { closePopup(); setFull(false); $('apt').value = c.key; selectApt(); $('dash').scrollIntoView({ behavior: 'smooth' }); });
   const shut = mk('button', '닫기');
-  shut.type = 'button'; shut.className = 'sec'; shut.style.cssText = 'grid-column:2;grid-row:2';
+  shut.type = 'button'; shut.className = 'sec'; shut.style.cssText = 'grid-column:2;grid-row:3';
   shut.addEventListener('click', closePopup);
   const btns = mk('div');
   btns.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px';   // 토지이용계획·리포트 버튼은 같은 너비, 닫기는 리포트 버튼 옆
   
-  // 토지이용계획: 버튼을 누르면 별도 팝업에 이 단지 필지의 용도지역·지구·구역을 보여 준다(한 번 불러오면 다시 묻지 않는다)
-  const lu = mk('button', '토지이용계획 보기');
-  lu.type = 'button'; lu.className = 'sec'; lu.style.cssText = 'grid-column:1';
-  let luData = null;
-  lu.addEventListener('click', async () => {
-    const dlg = mk('dialog'), body = mk('div'), bar = mk('div', null), shutLu = mk('button', '닫기');
+  // 단지 정보·토지이용계획: 버튼을 누르면 별도 팝업(모달)에 보여 준다. 한 번 불러온 내용은 다시 묻지 않는다.
+  const parcelAddr = () => { const reg = regOf(); return [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' '); };
+  const note = (t) => { const d = mk('div', t); d.style.cssText = 'color:var(--color-fg-muted);margin-top:6px'; return d; };
+  const openDlg = async (title, load, fill) => {
+    const dlg = mk('dialog'), body = mk('div'), bar = mk('div'), shutDlg = mk('button', '닫기');
     dlg.style.cssText = 'width:min(26rem,calc(100vw - 2rem));max-height:80vh;padding:16px;border:1px solid var(--color-border-line);border-radius:12px;background:var(--color-panel);color:var(--color-fg);font:400 13px/1.5 var(--font-sans)';
     body.style.cssText = 'overflow:auto;max-height:calc(80vh - 90px);margin:10px 0';
     bar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px';
-    shutLu.type = 'button'; shutLu.className = 'sec'; shutLu.style.cssText = 'display:block;margin-left:auto';
-    const ttl = mk('b', `${c.apt} 토지이용계획`);
+    shutDlg.type = 'button'; shutDlg.className = 'sec'; shutDlg.style.cssText = 'display:block;margin-left:auto';
+    const ttl = mk('b', title);
     ttl.style.fontSize = '15px';
     bar.append(ttl);
-    dlg.append(bar, body, shutLu);
+    dlg.append(bar, body, shutDlg);
     const close = () => dlg.close();
-    shutLu.addEventListener('click', close);
+    shutDlg.addEventListener('click', close);
     dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });   // 바깥(배경)을 누르면 닫는다
     dlg.addEventListener('close', () => dlg.remove());
     document.body.append(dlg); dlg.showModal();
-    if (!c.jibun) { body.textContent = '지번 정보가 없어 필지를 찾을 수 없습니다.'; return; }
-    try {
-      if (!luData) {
-        body.textContent = '불러오는 중…';
-        const reg = regOf();
-        const r = await fetch('/api/landuse?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error);
-        luData = j;
+    try { body.textContent = '불러오는 중…'; fill(body, await load()); }
+    catch (e) { body.textContent = `불러오지 못했습니다: ${e.message}`; }
+  };
+  const cached = (api) => { let v = null; return async () => {
+    if (v) return v;
+    if (!c.jibun) throw new Error('지번 정보가 없어 필지를 찾을 수 없습니다.');
+    const r = await fetch(`/api/${api}?` + new URLSearchParams({ addr: parcelAddr() })), j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    return (v = j);
+  }; };
+  const luLoad = cached('landuse'), luLoadOf = (api) => cached(api)();
+
+  const lu = mk('button', '토지이용계획 보기'), info = mk('button', '단지 정보 보기');
+  for (const b of [info, lu]) { b.type = 'button'; b.className = 'sec'; b.style.cssText = 'grid-column:1'; }
+  lu.addEventListener('click', () => openDlg(`${c.apt} 토지이용계획`, luLoad, (body, j) => {
+    const parts = ['포함', '저촉', '접함'].map((k) => [k, j.items.filter((x) => x[1] === k).map((x) => x[0])]).filter(([, v]) => v.length);
+    body.replaceChildren(note(`${j.address}${j.updated ? ' · ' + j.updated + ' 기준' : ''}`), ...parts.map(([k, v]) => {
+      const d = mk('div'), b = mk('b', k + ' ');
+      d.style.cssText = 'margin-top:8px'; d.append(b, document.createTextNode(v.join(', ')));
+      return d;
+    }), note('포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
+  }));
+  // 단지 정보: 공동주택 기본·상세정보(공공데이터포털)에 세대수·주차대수 등이 있고, 전용면적별 세대수는 공시가격 자료의 동·호를 세어 보탠다(없는 단지는 생략).
+  const infoLoad = (() => { let v = null; return async () => {
+    if (v) return v;
+    const [d, g] = await Promise.all([
+      fetch('/api/aptdetail?' + new URLSearchParams({ sgg: state.lawd, dong: c.dong, apt: c.apt })).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); return j; }),
+      c.jibun ? luLoadOf('aptinfo').catch(() => null) : null,
+    ]);
+    return (v = { d, g });
+  }; })();
+  info.addEventListener('click', () => openDlg(`${c.apt} 단지 정보`, infoLoad, (body, { d, g }) => {
+    const b = d.base, t = d.dtl, num = (x) => Number(x) || 0, cnt = (x) => (num(x) ? num(x).toLocaleString() : '');
+    const nk = (x) => x.replace(/\s+/g, ''), grp = g && (g.groups.find((q) => nk(q.name).includes(nk(c.apt)) || nk(c.apt).includes(nk(q.name))) || (g.groups.length === 1 ? g.groups[0] : null));
+    const hh = num(b.kaptdaCnt) || num(b.hoCnt) || (grp ? grp.total : 0);
+    const date = /^\d{8}$/.test(b.kaptUsedate || '') ? `${b.kaptUsedate.slice(0, 4)}.${b.kaptUsedate.slice(4, 6)}.${b.kaptUsedate.slice(6)}` : '';
+    const ground = num(t.kaptdPcnt), under = num(t.kaptdPcntu), park = ground + under;
+    const sec = (title, rows) => {
+      rows = rows.filter(([, v]) => v);
+      if (!rows.length) return null;
+      const s = mk('div'), h = mk('b', title);
+      s.style.marginTop = '10px'; h.style.cssText = 'display:block;border-bottom:1px solid var(--color-border-line);padding-bottom:2px;margin-bottom:2px';
+      s.append(h);
+      for (const [k, v] of rows) {
+        const r = mk('div'), kk = mk('span', k), vv = mk('b', v);
+        r.style.cssText = 'display:flex;justify-content:space-between;gap:12px;padding:2px 0';
+        vv.style.cssText = 'text-align:right;font-weight:600'; kk.style.color = 'var(--color-fg-muted)';
+        r.append(kk, vv); s.append(r);
       }
-      const j = luData, note = (t) => { const d = mk('div', t); d.style.cssText = 'color:var(--color-fg-muted);margin-top:6px'; return d; };
-      const parts = ['포함', '저촉', '접함'].map((k) => [k, j.items.filter((x) => x[1] === k).map((x) => x[0])]).filter(([, v]) => v.length);
-      body.replaceChildren(note(`${j.address}${j.updated ? ' · ' + j.updated + ' 기준' : ''}`), ...parts.map(([k, v]) => {
-        const d = mk('div'), b = mk('b', k + ' ');
-        d.style.cssText = 'margin-top:8px'; d.append(b, document.createTextNode(v.join(', ')));
-        return d;
-      }), note('포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
-    } catch (e) { body.textContent = '토지이용계획을 불러오지 못했습니다: ' + e.message; }
-  });
-  btns.append(lu, go, shut);
+      return s;
+    };
+    const areaRows = grp ? grp.areas.map(([a, n]) => [`전용 ${a}㎡ (${pyeong(a)}평)`, `${n.toLocaleString()}세대`]) : [];
+    const bands = [['60㎡ 이하', b.kaptMparea60], ['60㎡ 초과 85㎡ 이하', b.kaptMparea85], ['85㎡ 초과 135㎡ 이하', b.kaptMparea135], ['135㎡ 초과', b.kaptMparea136]].map(([k, v]) => [k, num(v) ? `${num(v).toLocaleString()}세대` : '']);
+    const parts = [
+      sec('기본 정보', [['단지명', b.kaptName], ['주소', b.doroJuso || b.kaptAddr], ['총 세대수', hh ? `${hh.toLocaleString()}세대` : ''], ['동 수', b.kaptDongCnt ? `${b.kaptDongCnt}개 동` : ''],
+        ['층수', b.kaptTopFloor ? `지상 ${b.kaptTopFloor}층${num(b.kaptBaseFloor) ? ` · 지하 ${b.kaptBaseFloor}층` : ''}` : (grp && grp.maxFloor ? `최고 ${grp.maxFloor}층` : '')],
+        ['사용승인일', date], ['주택 유형', [b.codeAptNm, b.codeSaleNm].filter(Boolean).join(' · ')], ['난방', b.codeHeatNm], ['복도 유형', b.codeHallNm], ['건물 구조', t.codeStr],
+        ['시공사', b.kaptBcompany], ['시행사', b.kaptAcompany], ['관리 방식', b.codeMgrNm], ['관리사무소', b.kaptTel]]),
+      sec('주차·설비', [['주차대수', park ? `${park.toLocaleString()}대` : ''], ['지상', ground ? `${ground.toLocaleString()}대` : ''], ['지하', under ? `${under.toLocaleString()}대` : ''],
+        ['세대당 주차', park && hh ? `${(park / hh).toFixed(2)}대` : ''], ['승강기', cnt(t.kaptdEcnt) ? `${cnt(t.kaptdEcnt)}대` : ''], ['CCTV', cnt(t.kaptdCccnt) ? `${cnt(t.kaptdCccnt)}대` : ''],
+        ['전기차 충전기', num(t.groundElChargerCnt) + num(t.undergroundElChargerCnt) ? `지상 ${num(t.groundElChargerCnt)} · 지하 ${num(t.undergroundElChargerCnt)}대` : '']]),
+      sec(areaRows.length ? '전용면적별 세대수' : '면적 구간별 세대수', areaRows.length ? areaRows : bands),
+      sec('주변', [['지하철', [t.subwayLine, t.subwayStation, t.kaptdWtimesub && `도보 ${t.kaptdWtimesub}`].filter(Boolean).join(' ')], ['버스 정류장', t.kaptdWtimebus && `도보 ${t.kaptdWtimebus}`], ['편의시설', t.convenientFacility], ['교육시설', t.educationFacility]]),
+    ].filter(Boolean);
+    body.replaceChildren(note(`공동주택 단지 목록과 맞춘 이름: ${d.matched}${areaRows.length ? ` · 전용면적별 세대수는 공시가격 ${g.year}년 자료 기준` : ''}`), ...parts,
+      note('출처 국토교통부 공동주택 기본·상세정보(공공데이터포털). 단지에 따라 비어 있는 항목은 보이지 않습니다.'));
+  }));
+  btns.append(info, lu, go, shut);
   card.append(head, sub, list, btns); wrap.append(card);
   const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
   kmap.popupKey = c.key;
