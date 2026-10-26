@@ -1332,13 +1332,13 @@ function openPopup(c, pos, size) {
   const KINDS3 = ['sale', 'jeonse', 'wolse'];
   Promise.all(KINDS3.map(kindRows)).then((rows) => {
     if (kmap.popup !== ov) return;   // 그 사이 닫혔거나 다른 단지를 눌렀으면 그리지 않는다
-    const by = new Map(), tot = [0, 0, 0];   // 면적 → 종류별 {n: 건수, sum: 가격 합, rent: 월세 합}
+    const by = new Map(), tot = [0, 0, 0];   // 면적 → 종류별 {n: 건수, sum: 가격 합, rent: 월세 합, p: 가격 목록, r: 월세 목록}
     rows.forEach((rs, k) => {
       for (const t of rs) {
         if (aptKey(t) !== c.key) continue;
         const a = Math.round(t.area * 100) / 100;   // 앱의 다른 곳과 같이 전용면적을 소수 둘째 자리로 맞춘다
-        const g = (by.get(a) || by.set(a, [0, 1, 2].map(() => ({ n: 0, sum: 0, rent: 0 }))).get(a))[k];
-        g.n++; g.sum += t.price; g.rent += t.rent || 0;   // 매매·전세·월세 모두 price(만원)가 거래가·보증금
+        const g = (by.get(a) || by.set(a, [0, 1, 2].map(() => ({ n: 0, sum: 0, rent: 0, p: [], r: [] }))).get(a))[k];
+        g.n++; g.sum += t.price; g.rent += t.rent || 0; g.p.push(t.price); g.r.push(t.rent || 0);   // 매매·전세·월세 모두 price(만원)가 거래가·보증금
         tot[k]++;
       }
     });
@@ -1350,8 +1350,11 @@ function openPopup(c, pos, size) {
       const max = Math.max(1, ...items.map(([, g]) => g.n));
       list.replaceChildren(...items.map(([a, g]) => {
         const n = g.n, row = mk('div'), top = mk('div'), lab = mk('span', `전용 ${a}㎡ (${pyeong(a)}평)`), cnt = mk('b', `${n}건`), bar = mk('i');
-        // 평균 거래가(매매) · 평균 보증금(전세) · 평균 보증금/월세(월세)
-        const avg = mk('div', KINDS3[k] === 'sale' ? `평균 거래가 ${won(g.sum / n)}` : KINDS3[k] === 'jeonse' ? `평균 보증금 ${won(g.sum / n)}` : `평균 보증금 ${won(g.sum / n)} / 월세 ${fmtRent(g.rent / n)}만원`);
+        // 평균·중간값: 매매는 거래가, 전세는 보증금, 월세는 보증금 / 월세
+        const kd = KINDS3[k], what = kd === 'sale' ? '거래가' : '보증금';
+        const txt = (pr, rt) => kd === 'wolse' ? `${what} ${won(pr)} / 월세 ${fmtRent(rt)}만원` : `${what} ${won(pr)}`;
+        const avg = mk('div'), l1 = mk('div', '평균 ' + txt(g.sum / n, g.rent / n)), l2 = mk('div', '중간값 ' + txt(d3.median(g.p), d3.median(g.r)));
+        avg.append(l1, l2);
         avg.style.cssText = 'position:relative;font-size:12px;color:var(--color-fg-muted)';
         top.style.cssText = 'position:relative;display:flex;justify-content:space-between;gap:8px';
         row.style.cssText = 'position:relative;padding:3px 6px;border-radius:4px;overflow:hidden';
