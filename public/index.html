@@ -1342,7 +1342,7 @@ function openPopup(c, pos, size) {
   closePopup();
   const wrap = mk('div'), card = mk('div');
   wrap.style.cssText = `padding-bottom:${Math.round(size / 2) + 8}px`;   // 원과 겹치지 않게 위로 띄운다
-  card.style.cssText = 'width:290px;box-sizing:border-box;padding:10px 12px;border-radius:10px;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--color-border-line);box-shadow:0 4px 14px rgba(0,0,0,.3);font:400 13px/1.45 var(--font-sans)';
+  card.style.cssText = 'width:290px;box-sizing:border-box;padding:10px 12px;border-radius:10px;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--color-border-line);font:400 13px/1.45 var(--font-sans)';
   const head = mk('div'), ttl = mk('b', c.apt), x = mk('button', '×');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:8px';
   x.type = 'button'; x.title = '닫기';
