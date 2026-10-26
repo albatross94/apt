@@ -1508,10 +1508,11 @@ function openPopup(c, pos, size) {
       if (!rows.length) return null;
       const s = mk('div', null, 'ds');
       s.append(mk('h3', title));
-      for (const [k, v] of rows) {
+      for (const [k, v, hot] of rows) {
         const r = mk('div'), kk = mk('span', k), vv = mk('b', v);
         r.style.cssText = 'display:flex;justify-content:space-between;gap:12px;padding:2px 0';
         vv.style.cssText = 'text-align:right;font-weight:600'; kk.style.color = 'var(--color-fg-muted)';
+        if (hot) { kk.style.cssText = vv.style.cssText = 'font-weight:700;color:#d00'; vv.style.textAlign = 'right'; }
         r.append(kk, vv); s.append(r);
       }
       return s;
@@ -1540,7 +1541,7 @@ function openPopup(c, pos, size) {
       if (!f.ym) { feeCard.lastChild.textContent = '최근 공개된 공용관리비 자료가 없습니다.'; return; }
       const area = num(b.kaptMarea), perHh = hh ? Math.round(f.total / hh) : 0, perM2 = area ? Math.round(f.total / area) : 0;
       const fee = sec('공용관리비', [
-        ['기준월', `${f.ym.slice(0, 4)}.${f.ym.slice(4)}`], ['월 합계', won(f.total / 10000)], ['세대당 월', perHh ? `${perHh.toLocaleString()}원` : ''], ['㎡당 월', perM2 ? `${perM2.toLocaleString()}원` : ''],
+        ['기준월', `${f.ym.slice(0, 4)}.${f.ym.slice(4)}`], ['월 합계', won(f.total / 10000)], ['세대당 월', perHh ? `${perHh.toLocaleString()}원` : '', true], ['㎡당 월', perM2 ? `${perM2.toLocaleString()}원` : ''],
         ...[...f.items].sort((x, y) => y[1] - x[1]).map(([k, v]) => [k, won(v / 10000)]),
       ]);
       feeCard.replaceWith(fee);
