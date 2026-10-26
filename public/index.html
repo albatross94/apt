@@ -9,6 +9,11 @@
 <style>
 #map-wrap{position:relative}
 #map-box{height:520px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#map-search{position:absolute;top:10px;left:10px;z-index:10;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:calc(100% - 150px)}
+#map-search input{width:13rem;max-width:100%;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#map-search button{box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#map-smsg{flex-basis:100%;width:fit-content;padding:2px 8px;border-radius:6px;background:var(--color-bg);color:var(--color-fg);font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#map-smsg:empty{display:none}
 #map-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
 #map-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg)}
 #map-wrap.full #map-box{height:100%;border-radius:0;border:0}
@@ -193,6 +198,12 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     </div>
     <div id="map-wrap" hidden>
       <div id="map-box"></div>
+      <div id="map-search">
+        <input id="map-q" type="search" list="map-list" placeholder="단지 이름 검색" autocomplete="off" aria-label="단지 이름 검색">
+        <button type="button" id="map-sgo">검색</button>
+        <datalist id="map-list"></datalist>
+        <span id="map-smsg" role="status"></span>
+      </div>
       <button type="button" id="map-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button>
     </div>
   </section>
@@ -1278,13 +1289,14 @@ function buildReportData() {
 }
 
 /* ---------- 거래량 지도 (좌표: V-World 지오코더, 지도: 카카오맵) ---------- */
-const kmap = { sdk: null, map: null, overlays: [], popup: null, token: 0 };
+const kmap = { sdk: null, map: null, overlays: [], placed: new Map(), all: null, popup: null, token: 0 };
 
 function mapReset() {
   kmap.token++;
   closePopup();
   for (const o of kmap.overlays) o.setMap(null);
-  kmap.overlays = [];
+  kmap.overlays = []; kmap.placed = new Map(); kmap.all = null;
+  $('map-q').value = ''; $('map-smsg').textContent = '';
   setFull(false);
   $('map-wrap').hidden = true;
   $('map-status').textContent = '';
@@ -1397,6 +1409,45 @@ function loadKakao() {
   return kmap.sdk;
 }
 
+const regOf = () => state.regions.find((x) => x.code === state.lawd) || { sido: '', name: '' };
+
+// 단지의 지번 주소를 좌표로 바꿔 c.lat/c.lng 에 넣는다(서버가 주소별로 캐시). 실패 사유(없으면 '')를 돌려준다.
+async function geocodeComplex(c) {
+  if (c.lat != null || !c.jibun) return '';
+  const reg = regOf();
+  try {
+    const r = await fetch('/api/geocode?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
+    const j = await r.json();
+    if (r.ok) { Object.assign(c, j); return ''; }
+    return r.status === 404 ? '' : j.error;   // 404는 주소를 못 찾은 것이라 건너뛰고, 그 밖의 오류는 사유를 돌려준다
+  } catch (e) { return e.message; }
+}
+
+// 지도에 단지 원 하나를 그린다. rank: 거래량 순위(0부터). 1~3위 빨강, 4~6위 노랑, 7~10위 초록, 나머지는 파랑
+function drawBubble(c, rank) {
+  const [bg, fg] = rank < 3 ? ['#e03131', '#fff'] : rank < 6 ? ['#f2c200', '#1d2330'] : rank < 10 ? ['#2f9e44', '#fff'] : [col(0), '#fff'];
+  const pos = new kakao.maps.LatLng(c.lat, c.lng);
+  const size = 26 + 40 * Math.sqrt(c.n / kmap.all[0].n);   // 건수에 따라 지름 26~66px
+  const el = mk('button', String(c.n));
+  el.type = 'button';
+  el.title = `${c.apt} (${c.dong}) · ${c.n}건`;
+  el.style.cssText = `position:relative;width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;background:${bg};color:${fg};`
+    + `opacity:${rank < 10 ? 0.95 : 0.55 + 0.4 * c.n / kmap.all[0].n};font:700 12px/1 var(--font-sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);padding:0`;
+  el.addEventListener('click', () => openPopup(c, pos, size));
+  if (rank < 10) {   // 1~10위는 순위 배지와 "N위 단지명"을 함께 보여 준다
+    const bd = mk('span', String(rank + 1));
+    bd.style.cssText = 'position:absolute;top:-8px;left:-8px;min-width:20px;height:20px;box-sizing:border-box;border-radius:10px;padding:0 5px;background:#1d2330;color:#fff;border:2px solid #fff;font:800 11px/16px var(--font-sans);text-align:center';
+    el.append(bd);
+    const lb = mk('span', `${rank + 1}위 ${c.apt}`);
+    lb.style.cssText = 'position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font:500 11px/1.4 var(--font-sans);white-space:nowrap;pointer-events:none';
+    el.append(lb);
+  }
+  // 순위가 높을수록 위에 그린다(원이 겹쳐도 상위 단지가 가려지지 않게)
+  kmap.overlays.push(new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: el, yAnchor: 0.5, zIndex: 1000 - rank, clickable: true }));
+  kmap.placed.set(c.key, { c, pos, size });
+  return pos;
+}
+
 async function showMap() {
   const btn = $('map-go'), st = $('map-status'), tk = ++kmap.token;
   btn.disabled = true; st.className = 'gx-note'; st.textContent = '지도를 불러오는 중…';
@@ -1408,24 +1459,17 @@ async function showMap() {
       c.n++;
       if (!c.jibun && t.jibun) c.jibun = t.jibun;
     }
-    const top = [...by.values()].sort((a, b) => b.n - a.n || a.apt.localeCompare(b.apt, 'ko')).slice(0, Number($('map-top').value));
-    const reg = state.regions.find((x) => x.code === state.lawd) || { sido: '', name: '' };
+    kmap.all = [...by.values()].sort((a, b) => b.n - a.n || a.apt.localeCompare(b.apt, 'ko'));
+    const top = kmap.all.slice(0, Number($('map-top').value));
+    $('map-list').replaceChildren(...kmap.all.map((c) => { const o = document.createElement('option'); o.value = `${c.apt} · ${c.dong}`; return o; }));
     await loadKakao();
     if (tk !== kmap.token) return;
 
-    // 좌표 찾기 (서버가 주소별로 캐시). 4개씩 동시에 요청
+    // 좌표 찾기 (4개씩 동시에 요청)
     let next = 0, done = 0, lastErr = '';
     await Promise.all(Array.from({ length: 4 }, async () => {
       while (next < top.length) {
-        const c = top[next++];
-        if (c.jibun) {
-          try {
-            const r = await fetch('/api/geocode?' + new URLSearchParams({ addr: [reg.sido, reg.name === reg.sido ? '' : reg.name, c.dong, c.jibun].filter(Boolean).join(' ') }));
-            const j = await r.json();
-            if (r.ok) Object.assign(c, j);
-            else if (r.status !== 404) lastErr = j.error;   // 404는 주소를 못 찾은 것이라 건너뛰고, 그 밖의 오류는 기억해 둔다
-          } catch (e) { lastErr = e.message; }
-        }
+        lastErr = (await geocodeComplex(top[next++])) || lastErr;
         st.textContent = `단지 위치를 찾는 중… ${++done}/${top.length}`;
       }
     }));
@@ -1433,38 +1477,15 @@ async function showMap() {
 
     const placed = top.filter((c) => c.lat != null);
     if (!placed.length) throw new Error(lastErr || '단지 위치를 찾지 못했습니다.');
-    const box = $('map-box');
     $('map-wrap').hidden = false;
-    if (!kmap.map) kmap.map = new kakao.maps.Map(box, { center: new kakao.maps.LatLng(placed[0].lat, placed[0].lng), level: 6 });
+    if (!kmap.map) kmap.map = new kakao.maps.Map($('map-box'), { center: new kakao.maps.LatLng(placed[0].lat, placed[0].lng), level: 6 });
     for (const o of kmap.overlays) o.setMap(null);
-    kmap.overlays = [];
+    kmap.overlays = []; kmap.placed = new Map();
     closePopup();
     kmap.map.relayout();
 
-    const maxN = placed[0].n, bounds = new kakao.maps.LatLngBounds();
-    placed.forEach((c, i) => {
-      // 1~3위 빨강, 4~6위 노랑, 7~10위 초록, 나머지는 파랑
-      const [bg, fg] = i < 3 ? ['#e03131', '#fff'] : i < 6 ? ['#f2c200', '#1d2330'] : i < 10 ? ['#2f9e44', '#fff'] : [col(0), '#fff'];
-      const pos = new kakao.maps.LatLng(c.lat, c.lng);
-      const size = 26 + 40 * Math.sqrt(c.n / maxN);   // 건수에 따라 지름 26~66px
-      const el = mk('button', String(c.n));
-      el.type = 'button';
-      el.title = `${c.apt} (${c.dong}) · ${c.n}건`;
-      el.style.cssText = `position:relative;width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;background:${bg};color:${fg};`
-        + `opacity:${i < 10 ? 0.95 : 0.55 + 0.4 * c.n / maxN};font:700 12px/1 var(--font-sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);padding:0`;
-      el.addEventListener('click', () => openPopup(c, pos, size));
-      if (i < 10) {   // 1~10위는 순위 배지와 "N위 단지명"을 함께 보여 준다
-        const bd = mk('span', String(i + 1));
-        bd.style.cssText = `position:absolute;top:-8px;left:-8px;min-width:20px;height:20px;box-sizing:border-box;border-radius:10px;padding:0 5px;background:#1d2330;color:#fff;border:2px solid #fff;font:800 11px/16px var(--font-sans);text-align:center`;
-        el.append(bd);
-        const lb = mk('span', `${i + 1}위 ${c.apt}`);
-        lb.style.cssText = 'position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font:500 11px/1.4 var(--font-sans);white-space:nowrap;pointer-events:none';
-        el.append(lb);
-      }
-      bounds.extend(pos);
-      // 순위가 높을수록 위에 그린다(원이 겹쳐도 상위 단지가 가려지지 않게)
-      kmap.overlays.push(new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: el, yAnchor: 0.5, zIndex: 1000 - i, clickable: true }));
-    });
+    const bounds = new kakao.maps.LatLngBounds();
+    for (const c of placed) bounds.extend(drawBubble(c, kmap.all.indexOf(c)));
     kmap.map.setBounds(bounds);
     if (!kmap.bound) { kmap.bound = true; kakao.maps.event.addListener(kmap.map, 'click', closePopup); }
     const miss = top.length - placed.length;
@@ -1472,6 +1493,34 @@ async function showMap() {
   } catch (e) { st.className = 'gx-note err'; st.textContent = e.message; }
   if (tk === kmap.token) btn.disabled = false;
 }
+
+// 단지 이름으로 찾기: 지도에 없는 단지(표시 단지 수 밖)도 위치를 찾아 원을 추가하고, 그 단지의 팝업을 연다
+async function searchMap() {
+  const msg = $('map-smsg'), q0 = $('map-q').value, tk = kmap.token;
+  const norm = (x) => x.replace(/\s+/g, '').toLowerCase();
+  const q = norm(q0);
+  msg.textContent = '';
+  if (!q || !kmap.all) return;
+  const hits = kmap.all.filter((c) => norm(`${c.apt}·${c.dong}`) === q || norm(c.apt) === q);   // 목록에서 고른 값·이름 그대로
+  const found = hits.length ? hits : kmap.all.filter((c) => norm(c.apt).includes(q));
+  if (!found.length) { msg.textContent = '일치하는 단지가 없습니다.'; return; }
+  const c = found[0];   // 여러 개면 거래가 가장 많은 단지(목록이 건수순)
+  const many = found.length > 1 ? `${found.length}개 단지가 검색되어 거래가 가장 많은 ${c.apt}(${c.dong})를 표시합니다.` : '';
+  if (!kmap.placed.has(c.key)) {
+    msg.textContent = '단지 위치를 찾는 중…';
+    const err = await geocodeComplex(c);
+    if (tk !== kmap.token) return;
+    if (c.lat == null) { msg.textContent = err || `${c.apt}(${c.dong})의 위치를 찾지 못했습니다.`; return; }
+    drawBubble(c, kmap.all.indexOf(c));
+  }
+  msg.textContent = many;
+  const { pos, size } = kmap.placed.get(c.key);
+  if (kmap.map.getLevel() > 4) kmap.map.setLevel(4);
+  kmap.map.setCenter(pos);
+  openPopup(c, pos, size);
+}
+$('map-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchMap(); } });
+$('map-sgo').onclick = searchMap;
 $('map-go').onclick = showMap;
 
 /* ---------- 근거 ---------- */
