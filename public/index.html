@@ -7,6 +7,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="/report.js"></script>
 <style>
+#map-wrap{position:relative}
+#map-box{height:520px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#map-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#map-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg)}
+#map-wrap.full #map-box{height:100%;border-radius:0;border:0}
+#map-box button[aria-pressed=true]{background:var(--c0)!important;color:#fff!important;border-color:var(--c0)!important}
 :root{--color-bg:#ffffff;--color-fg:#1d2330;--color-fg-muted:#5f6878;--color-panel:#f6f7f9;--color-border-line:#dde1e8;--color-bad:#c0392b;
 --cds-font-size-title:1.75rem;--cds-font-size-heading:1.0625rem;--cds-font-size-body:.9375rem;--cds-font-size-caption:.8125rem;--cds-font-weight-medium:600;
 --cds-gap-xs:.35rem;--cds-gap-sm:.6rem;--cds-gap-md:1rem;--cds-gap-lg:1.5rem;--cds-pad-xs:.3rem;--cds-pad-sm:.6rem;--cds-pad-lg:1.1rem;--cds-radius:10px;
@@ -185,7 +191,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <label>표시 단지 수<select id="map-top"><option value="20">상위 20개</option><option value="50" selected>상위 50개</option><option value="100">상위 100개</option></select></label>
       <button type="button" id="map-go">지도에 표시</button><span id="map-status" class="gx-note"></span>
     </div>
-    <div id="map-box" hidden style="height:520px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)"></div>
+    <div id="map-wrap" hidden>
+      <div id="map-box"></div>
+      <button type="button" id="map-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button>
+    </div>
   </section>
 
   <div id="dash" hidden>
@@ -1276,45 +1285,88 @@ function mapReset() {
   closePopup();
   for (const o of kmap.overlays) o.setMap(null);
   kmap.overlays = [];
-  $('map-box').hidden = true;
+  setFull(false);
+  $('map-wrap').hidden = true;
   $('map-status').textContent = '';
   $('map-go').disabled = false;
   $('map-card').hidden = !state.raw.length;
-  $('map-note').textContent = `${regionLabel()} · ${periodLabel()} ${KNAME[$('kind').value]} 거래가 많은 단지입니다. 원이 클수록 거래가 많고, 누르면 전용면적별 거래 건수를 보여 줍니다.`;
+  $('map-note').textContent = `${regionLabel()} · ${periodLabel()} ${KNAME[$('kind').value]} 거래가 많은 단지입니다. 원이 클수록 거래가 많고, 누르면 전용면적별 매매·전세·월세 건수를 보여 줍니다.`;
 }
+
+// 지도를 화면 가득 키우거나 되돌린다. 크기가 바뀌면 relayout 하고 보던 중심은 유지한다.
+function setFull(on) {
+  const w = $('map-wrap');
+  if (w.classList.contains('full') === on) return;
+  w.classList.toggle('full', on);
+  $('map-full').textContent = on ? '전체 화면 닫기 (Esc)' : '전체 화면';
+  if (kmap.map) { const c = kmap.map.getCenter(); kmap.map.relayout(); kmap.map.setCenter(c); }
+}
+$('map-full').onclick = () => setFull(!$('map-wrap').classList.contains('full'));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFull(false); });
 
 function closePopup() { if (kmap.popup) { kmap.popup.setMap(null); kmap.popup = null; } }
 
-// 단지를 누르면 전용면적별 거래 건수를 팝업으로 보여 준다
+// 단지를 누르면 매매·전세·월세 탭별로 전용면적별 거래 건수를 팝업으로 보여 준다
+// (지도 원은 조회한 종류 하나만 세므로, 나머지 종류는 같은 지역·기간으로 불러와 합친다)
 function openPopup(c, pos, size) {
   closePopup();
-  const KN = KNAME[$('kind').value];
   const wrap = mk('div'), card = mk('div');
   wrap.style.cssText = `padding-bottom:${Math.round(size / 2) + 8}px`;   // 원과 겹치지 않게 위로 띄운다
-  card.style.cssText = 'width:250px;box-sizing:border-box;padding:10px 12px;border-radius:10px;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--color-border-line);box-shadow:0 4px 14px rgba(0,0,0,.3);font:400 13px/1.45 var(--font-sans)';
+  card.style.cssText = 'width:290px;box-sizing:border-box;padding:10px 12px;border-radius:10px;background:var(--color-bg);color:var(--color-fg);border:1px solid var(--color-border-line);box-shadow:0 4px 14px rgba(0,0,0,.3);font:400 13px/1.45 var(--font-sans)';
   const head = mk('div'), ttl = mk('b', c.apt), x = mk('button', '×');
   head.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:8px';
   x.type = 'button'; x.title = '닫기';
   x.style.cssText = 'border:0;background:none;color:var(--color-fg-muted);font-size:18px;line-height:1;cursor:pointer;padding:0';
   x.addEventListener('click', closePopup);
   head.append(ttl, x);
-  const sub = mk('div', `${c.dong} · ${KN} ${c.n}건`);
+  const sub = mk('div', `${c.dong} · 거래 건수를 불러오는 중…`), list = mk('div');
   sub.style.cssText = 'color:var(--color-fg-muted);font-size:12px;margin-bottom:6px';
-  const list = mk('div'), maxA = Math.max(...c.areas.values());
-  list.style.cssText = 'max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:3px';
-  for (const [a, n] of [...c.areas].sort((x, y) => x[0] - y[0])) {
-    const row = mk('div'), lab = mk('span', `전용 ${a}㎡ (${pyeong(a)}평)`), cnt = mk('b', `${n}건`), bar = mk('i');
-    row.style.cssText = 'position:relative;display:flex;justify-content:space-between;gap:8px;padding:2px 6px;border-radius:4px;overflow:hidden';
-    bar.style.cssText = `position:absolute;left:0;top:0;bottom:0;width:${Math.round(100 * n / maxA)}%;background:${col(0)};opacity:.18`;   // 건수 막대
-    lab.style.position = cnt.style.position = 'relative';
-    row.append(bar, lab, cnt); list.append(row);
-  }
+  list.style.cssText = 'max-height:200px;overflow:auto';
   const go = mk('button', '이 단지 리포트 보기');
   go.type = 'button'; go.className = 'sec';
   go.style.cssText = 'margin-top:8px;width:100%';
-  go.addEventListener('click', () => { closePopup(); $('apt').value = c.key; selectApt(); $('dash').scrollIntoView({ behavior: 'smooth' }); });
+  go.addEventListener('click', () => { closePopup(); setFull(false); $('apt').value = c.key; selectApt(); $('dash').scrollIntoView({ behavior: 'smooth' }); });
   card.append(head, sub, list, go); wrap.append(card);
-  kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
+  const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
+
+  const KINDS3 = ['sale', 'jeonse', 'wolse'];
+  Promise.all(KINDS3.map(kindRows)).then((rows) => {
+    if (kmap.popup !== ov) return;   // 그 사이 닫혔거나 다른 단지를 눌렀으면 그리지 않는다
+    const by = new Map(), tot = [0, 0, 0];   // 면적 → [매매, 전세, 월세]
+    rows.forEach((rs, k) => {
+      for (const t of rs) {
+        if (aptKey(t) !== c.key) continue;
+        const a = Math.round(t.area * 100) / 100;   // 앱의 다른 곳과 같이 전용면적을 소수 둘째 자리로 맞춘다
+        (by.get(a) || by.set(a, [0, 0, 0]).get(a))[k]++;
+        tot[k]++;
+      }
+    });
+    sub.textContent = c.dong;
+    // 탭: 매매 · 전세 · 월세 (처음엔 조회한 종류). 탭마다 전용면적별 건수와 막대를 보여 준다
+    const tabs = mk('div'), draw = (k) => {
+      [...tabs.children].forEach((b, n) => b.setAttribute('aria-pressed', String(n === k)));
+      const items = [...by].map(([a, n]) => [a, n[k]]).filter(([, n]) => n).sort((u, v) => u[0] - v[0]);
+      const max = Math.max(1, ...items.map(([, n]) => n));
+      list.replaceChildren(...items.map(([a, n]) => {
+        const row = mk('div'), lab = mk('span', `전용 ${a}㎡ (${pyeong(a)}평)`), cnt = mk('b', `${n}건`), bar = mk('i');
+        row.style.cssText = 'position:relative;display:flex;justify-content:space-between;gap:8px;padding:2px 6px;border-radius:4px;overflow:hidden';
+        bar.style.cssText = `position:absolute;left:0;top:0;bottom:0;width:${Math.round(100 * n / max)}%;background:${col(0)};opacity:.18`;
+        lab.style.position = cnt.style.position = 'relative';
+        row.append(bar, lab, cnt); return row;
+      }));
+      if (!items.length) list.append(mk('div', `${KNAME[KINDS3[k]]} 거래가 없습니다.`));
+    };
+    tabs.style.cssText = 'display:flex;gap:4px;margin-bottom:6px';
+    KINDS3.forEach((kd, k) => {
+      const b = mk('button', `${KNAME[kd]} ${tot[k]}`);
+      b.type = 'button';
+      b.style.cssText = 'flex:1;font:inherit;font-size:12px;padding:4px 0;border:1px solid var(--color-border-line);border-radius:6px;cursor:pointer;background:var(--color-bg);color:var(--color-fg)';
+      b.addEventListener('click', () => draw(k));
+      tabs.append(b);
+    });
+    list.before(tabs);
+    draw(KINDS3.indexOf($('kind').value));
+  }).catch((e) => { if (kmap.popup === ov) sub.textContent = '거래를 불러오지 못했습니다: ' + e.message; });
 }
 
 // 카카오맵 SDK는 키가 있을 때 처음 한 번만 불러온다
@@ -1345,10 +1397,8 @@ async function showMap() {
     // 단지별 거래 건수와 대표 지번
     const by = new Map();
     for (const t of state.raw) {
-      const c = by.get(aptKey(t)) || by.set(aptKey(t), { key: aptKey(t), apt: t.apt, dong: t.dong, jibun: '', n: 0, areas: new Map() }).get(aptKey(t));
+      const c = by.get(aptKey(t)) || by.set(aptKey(t), { key: aptKey(t), apt: t.apt, dong: t.dong, jibun: '', n: 0 }).get(aptKey(t));
       c.n++;
-      const a = Math.round(t.area * 100) / 100;   // 앱의 다른 곳과 같이 전용면적을 소수 둘째 자리로 맞춘다
-      c.areas.set(a, (c.areas.get(a) || 0) + 1);
       if (!c.jibun && t.jibun) c.jibun = t.jibun;
     }
     const top = [...by.values()].sort((a, b) => b.n - a.n || a.apt.localeCompare(b.apt, 'ko')).slice(0, Number($('map-top').value));
@@ -1377,7 +1427,7 @@ async function showMap() {
     const placed = top.filter((c) => c.lat != null);
     if (!placed.length) throw new Error(lastErr || '단지 위치를 찾지 못했습니다.');
     const box = $('map-box');
-    box.hidden = false;
+    $('map-wrap').hidden = false;
     if (!kmap.map) kmap.map = new kakao.maps.Map(box, { center: new kakao.maps.LatLng(placed[0].lat, placed[0].lng), level: 6 });
     for (const o of kmap.overlays) o.setMap(null);
     kmap.overlays = [];
