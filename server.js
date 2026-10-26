@@ -7,7 +7,7 @@ const path = require('path');
 const ROOT = __dirname;
 const PORT = process.env.PORT || 3000;
 
-// .env 로드 (SERVICE_KEY, VWORLD_KEY)
+// .env 로드 (SERVICE_KEY, VWORLD_KEY, KAKAO_JS_KEY)
 try {
   for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
@@ -18,7 +18,7 @@ try {
 const core = require('./lib/core');
 const auth = require('./lib/auth');
 
-const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units' };
+const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/config': 'config' };
 const AUTH_ROUTES = { '/api/login': 'login', '/api/logout': 'logout', '/api/me': 'me' };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
