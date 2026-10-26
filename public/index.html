@@ -1479,6 +1479,7 @@ function openPopup(c, pos, size) {
         avg.append(l1, l2);
         avg.style.cssText = 'position:relative;font-size:12px;color:var(--color-fg-muted)';
         top.style.cssText = 'position:relative;display:flex;justify-content:space-between;gap:8px';
+        lab.style.fontWeight = '700';   // 전용면적은 굵게
         row.style.cssText = 'position:relative;padding:3px 6px;border-radius:4px;overflow:hidden';
         row.style.cursor = 'pointer'; row.title = '누르면 이 면적의 리포트로 이동합니다';
         row.addEventListener('click', () => { closePopup(); setFull(false); $('apt').value = c.key; selectApt({ area: a, tab: KINDS3[k] }); $('dash').scrollIntoView({ behavior: 'smooth' }); });
