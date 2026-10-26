@@ -1398,11 +1398,11 @@ function openPopup(c, pos, size) {
   shut.type = 'button'; shut.className = 'sec';
   shut.addEventListener('click', closePopup);
   const btns = mk('div');
-  btns.style.cssText = 'display:flex;gap:6px;margin-top:8px';
-  btns.append(go, shut);
+  btns.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px';   // 토지이용계획·리포트 버튼은 같은 너비, 닫기는 리포트 버튼 옆
+  
   // 토지이용계획: 버튼을 누르면 별도 팝업에 이 단지 필지의 용도지역·지구·구역을 보여 준다(한 번 불러오면 다시 묻지 않는다)
   const lu = mk('button', '토지이용계획 보기');
-  lu.type = 'button'; lu.className = 'sec'; lu.style.cssText = 'width:100%;margin-top:8px';
+  lu.type = 'button'; lu.className = 'sec'; lu.style.cssText = 'grid-column:1';
   let luData = null;
   lu.addEventListener('click', async () => {
     const dlg = mk('dialog'), body = mk('div'), bar = mk('div', null), shutLu = mk('button', '닫기');
@@ -1438,7 +1438,8 @@ function openPopup(c, pos, size) {
       }), note('포함: 필지가 해당 지역·지구에 들어감 / 저촉: 일부가 걸침 / 접함: 맞닿아 있음 (출처 V-World·토지이음)'));
     } catch (e) { body.textContent = '토지이용계획을 불러오지 못했습니다: ' + e.message; }
   });
-  card.append(head, sub, list, lu, btns); wrap.append(card);
+  btns.append(lu, go, shut);
+  card.append(head, sub, list, btns); wrap.append(card);
   const ov = kmap.popup = new kakao.maps.CustomOverlay({ map: kmap.map, position: pos, content: wrap, yAnchor: 1, zIndex: 5000, clickable: true });
   kmap.popupKey = c.key;
 
