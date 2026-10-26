@@ -153,6 +153,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-site{display:flex;align-items:center;gap:10px;background:#8e1b1c;color:#fff;padding:16px 20px;border-radius:12px}
 .gx-site svg{flex:none}
 .gx-site h1{margin:0;font-size:1.4rem;font-weight:900;line-height:1.3}
+#login-form{width:min(32rem,100%)}
+#login-form .gx-site{padding:14px 16px}
+#login-form .gx-site h1{font-size:1.05rem}
+@media (min-width:600px){#login-form .gx-site h1{white-space:nowrap}}   /* 상호가 한 줄로 나오도록 카드를 넓힌다. 폰처럼 좁은 화면에서는 줄바꿈을 허용 */
 .gx-head h1{font-weight:900}
 .gx-card h2{display:flex;align-items:center;gap:8px;font-size:1.25rem;font-weight:700}
 .gx-card h2::before{content:"";width:8px;height:20px;background:#8e1b1c;flex:none}
