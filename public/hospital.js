@@ -72,6 +72,16 @@
     const on = $('hs-ul').querySelector('li.on'); if (on) on.scrollIntoView({ block: 'nearest' });
   }
 
+  // 약국은 초록색 핀으로 구분한다 (병원은 카카오 기본 파란 핀)
+  let pharmImg = null;
+  function pharmImage() {
+    if (!pharmImg) {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="29" height="42" viewBox="0 0 29 42"><path d="M14.5 1C7 1 1 7 1 14.5 1 24 14.5 41 14.5 41S28 24 28 14.5C28 7 22 1 14.5 1z" fill="#2e9d5b" stroke="#17653a" stroke-width="1.5"/><path d="M12.5 8h4v4.5H21v4h-4.5V21h-4v-4.5H8v-4h4.5z" fill="#fff"/></svg>';
+      pharmImg = new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), new kakao.maps.Size(29, 42), { offset: new kakao.maps.Point(14, 42) });
+    }
+    return pharmImg;
+  }
+
   async function draw(rows) {
     await loadKakao();
     if (!hs.map) {
@@ -87,7 +97,7 @@
     rows.forEach((r, i) => {
       if (!r.x || !r.y) { hs.markers.push(null); return; }
       const pos = new kakao.maps.LatLng(r.y, r.x);
-      const m = new kakao.maps.Marker({ map: hs.map, position: pos, title: r.n });
+      const m = new kakao.maps.Marker({ map: hs.map, position: pos, title: r.n, ...(r.c === '약국' ? { image: pharmImage() } : {}) });
       kakao.maps.event.addListener(m, 'click', () => openPop(i));
       hs.markers.push(m); bounds.extend(pos); placed++;
     });
@@ -114,9 +124,11 @@
       $('hs-h').textContent = `${label}${cond.length ? ' · ' + cond.join(' · ') : ''} — ${rows.length.toLocaleString()}곳`;
       const noPos = rows.filter((r) => !r.x || !r.y).length;
       $('hs-note').textContent = [
-        j.truncated ? `전체 ${j.total.toLocaleString()}곳 중 앞의 ${rows.length.toLocaleString()}곳만 보여 줍니다. 종별·진료과목·병원명으로 좁혀 보세요.` : '',
+        j.truncated ? `전체 ${j.total.toLocaleString()}곳 중 앞의 ${rows.length.toLocaleString()}곳만 보여 줍니다. 종별·진료과목·이름으로 좁혀 보세요.` : '',
+        !$('hs-cl').value && $('hs-dg').value ? '진료과목을 고르면 약국은 빠집니다.' : '',
+        rows.some((r) => r.c === '약국') ? '초록 핀은 약국, 파란 핀은 병원입니다.' : '',
         noPos ? `위치 정보가 없는 ${noPos}곳은 목록에만 나옵니다.` : '',
-        '출처: 건강보험심사평가원 병원정보서비스',
+        '출처: 건강보험심사평가원 병원정보서비스·약국정보서비스',
       ].filter(Boolean).join(' ');
       const ul = $('hs-ul'); ul.replaceChildren();
       if (!rows.length) { const li = el('li', 'nol', '조건에 맞는 병원이 없습니다.'); ul.append(li); }
