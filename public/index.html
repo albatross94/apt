@@ -426,17 +426,17 @@ const showApp = (authed, required) => {
 const rawFetch = window.fetch.bind(window);
 window.fetch = async (...a) => {
   const r = await rawFetch(...a);
-  if (r.status === 401 && String(a[0]).startsWith('/api/') && !/^\/api\/(login|me)/.test(String(a[0]))) showApp(false, true);
+  if (r.status === 401 && String(a[0]).startsWith('/api/') && !String(a[0]).startsWith('/api/auth')) showApp(false, true);
   return r;
 };
-rawFetch('/api/me').then((r) => r.json()).then((j) => showApp(j.authed, j.required))
+rawFetch('/api/auth?kind=me').then((r) => r.json()).then((j) => showApp(j.authed, j.required))
   .catch(() => showApp(true, false));   // 서버가 응답하지 않아도 화면은 열어 두고, 데이터 요청에서 오류가 나게 한다
 document.getElementById('login-form').onsubmit = async (e) => {
   e.preventDefault();
   const btn = document.getElementById('login-go'), err = document.getElementById('login-err'), pw = document.getElementById('login-pw');
   btn.disabled = true; err.textContent = '';
   try {
-    const r = await rawFetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw.value }) });
+    const r = await rawFetch('/api/auth?kind=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw.value }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || '로그인하지 못했습니다.');
     pw.value = ''; showApp(true, true);
@@ -444,7 +444,7 @@ document.getElementById('login-form').onsubmit = async (e) => {
   btn.disabled = false;
 };
 document.getElementById('logout').onclick = async () => {
-  await rawFetch('/api/logout', { method: 'POST' }).catch(() => {});
+  await rawFetch('/api/auth?kind=logout', { method: 'POST' }).catch(() => {});
   location.reload();   // 화면에 남은 조회 결과를 지우기 위해 새로 고친다
 };
 

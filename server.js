@@ -19,13 +19,17 @@ const core = require('./lib/core');
 const auth = require('./lib/auth');
 
 const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/landuse': 'landuse', '/api/aptinfo': 'aptinfo', '/api/aptdetail': 'aptdetail', '/api/aptfee': 'aptfee', '/api/hospital': 'hospital', '/api/config': 'config' };
-const AUTH_ROUTES = { '/api/login': 'login', '/api/logout': 'logout', '/api/me': 'me' };
+const AUTH_KINDS = ['login', 'logout', 'me'];   // /api/auth?kind=… (Vercel에서는 api/auth.js 한 함수)
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname.startsWith('/api/')) {
-    if (AUTH_ROUTES[u.pathname]) return auth.respond(AUTH_ROUTES[u.pathname], req, res);
+    if (u.pathname === '/api/auth') {
+      const kind = u.searchParams.get('kind');
+      if (!AUTH_KINDS.includes(kind)) { res.statusCode = 404; return res.end('Not found'); }
+      return auth.respond(kind, req, res);
+    }
     const route = API_ROUTES[u.pathname];
     if (!route) { res.statusCode = 404; return res.end('Not found'); }
     return core.respond(route, req, res);
