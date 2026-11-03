@@ -56,7 +56,35 @@
     d.append(el('div', '', r.a));
     if (r.t) d.append(el('div', '', r.t));
     if (/^https?:\/\//i.test(r.u)) { const a = el('a', '', '누리집'); a.href = r.u; a.target = '_blank'; a.rel = 'noopener'; d.append(a); }
+    d.append(hoursBox(r));
     return d;
+  }
+
+  /* ----- 진료시간 (국립중앙의료원 자료, 팝업을 열 때 불러옴) ----- */
+  const hoursCache = new Map();
+  function hoursBox(r) {
+    const box = el('div', 'hs-hrs', '진료시간 확인 중…');
+    const key = r.n + '|' + r.a;
+    let p = hoursCache.get(key);
+    if (!p) {
+      p = fetch('/api/hospital?' + new URLSearchParams({ hours: '1', name: r.n, addr: r.a, tel: r.t, pharm: r.c === '약국' ? '1' : '0' }))
+        .then(async (res) => { const j = await res.json(); if (!res.ok) throw new Error(j.error || '진료시간을 불러오지 못했습니다.'); return j; });
+      hoursCache.set(key, p);
+      p.catch(() => hoursCache.delete(key));   // 실패는 다음에 다시 시도할 수 있게
+    }
+    p.then((j) => {
+      box.replaceChildren();
+      if (!j.found || !j.hours.some(Boolean)) { box.textContent = '진료시간 정보가 없습니다.'; return; }
+      const today = (new Date().getDay() + 6) % 7;   // 월=0 … 일=6
+      const t = el('table');
+      j.days.forEach((day, i) => {
+        const tr = el('tr'); if (i === today) tr.className = 'today';
+        tr.append(el('th', '', day), el('td', '', j.hours[i] || (i === 7 ? '정보 없음' : '휴진·정보 없음')));
+        t.append(tr);
+      });
+      box.append(el('b', '', '진료시간'), t, el('small', '', '국립중앙의료원 자료 · 방문 전 전화로 확인하세요'));
+    }).catch((e) => { box.textContent = e.message; });
+    return box;
   }
 
   function openPop(i) {
