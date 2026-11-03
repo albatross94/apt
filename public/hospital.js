@@ -178,6 +178,17 @@
     }
     if (my === seq) $('hs-go').disabled = false;
   }
+  /* ----- 지도 전체 화면 (Esc로 돌아오기) ----- */
+  function setFull(on) {
+    const w = $('hs-wrap');
+    if (w.classList.contains('full') === on) return;
+    w.classList.toggle('full', on);
+    $('hs-full').textContent = on ? '전체 화면 닫기 (Esc)' : '전체 화면';
+    if (hs.map) { const c = hs.map.getCenter(); hs.map.relayout(); hs.map.setCenter(c); }   // 크기가 바뀌면 다시 계산하고 보던 중심은 유지
+  }
+  $('hs-full').onclick = () => setFull(!$('hs-wrap').classList.contains('full'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFull(false); });
+
   $('hs-go').onclick = search;
   $('hs-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
 })();

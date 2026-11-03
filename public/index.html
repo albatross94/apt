@@ -191,7 +191,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #map-top,#map-search input{font:inherit;color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem}
 #map-top{background:var(--color-bg)}
 #map-search input{background:#fff}
-#map-go,#map-search button,#map-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
+#map-go,#map-search button,#map-full,#hs-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
 #map-go{padding:.45rem 1.2rem}
 #map-go:disabled{opacity:.5;cursor:wait}
 #map-smsg{border-radius:8px}
@@ -233,7 +233,11 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #tab-trade[hidden],#tab-hospital[hidden]{display:none}
 .gx-ctrl input[type=search]{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:12rem}
 #hs-wrap{display:flex;gap:8px;height:520px}
-#hs-area{flex:1;min-width:0}
+#hs-area{position:relative;flex:1;min-width:0}
+#hs-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#hs-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg);padding:8px;box-sizing:border-box;height:auto}
+#hs-wrap.full #hs-area{height:auto}
+@media (max-width:720px){#hs-wrap.full{overflow:auto}#hs-wrap.full #hs-area{height:65vh}}
 #hs-box{height:100%;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
 #hs-lp{width:300px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
 #hs-ul{list-style:none;margin:0;padding:0}
@@ -384,7 +388,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <p class="gx-note" id="hs-note"></p>
     <div id="hs-wrap">
       <aside id="hs-lp" aria-label="병원 목록"><ul id="hs-ul"></ul></aside>
-      <div id="hs-area"><div id="hs-box"></div></div>
+      <div id="hs-area"><div id="hs-box"></div><button type="button" id="hs-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
     </div>
   </section>
 </div>
