@@ -82,7 +82,9 @@
         tr.append(el('th', '', day), el('td', '', j.hours[i] || (i === 7 ? '정보 없음' : '휴진·정보 없음')));
         t.append(tr);
       });
-      box.append(el('b', '', '진료시간'), t, el('small', '', '국립중앙의료원 자료 · 방문 전 전화로 확인하세요'));
+      box.append(el('b', '', '진료시간'), t);
+      if (j.note) box.append(el('div', 'hs-etc', j.note));   // 점심시간 등 기관이 적은 안내
+      box.append(el('small', '', '국립중앙의료원 자료 · 방문 전 전화로 확인하세요'));
     }).catch((e) => { box.textContent = e.message; });
     return box;
   }
