@@ -226,6 +226,26 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   .gx-warnbox{background:#fff3dc;border-color:#f0d49a;color:#7a4b00}
 }
 .gx-eyebrow{margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium)}
+.gx-maintabs{display:flex;gap:.4rem;flex-wrap:wrap}
+.gx-maintabs button{font:inherit;font-weight:var(--cds-font-weight-medium);padding:.6rem 1.3rem;border:1px solid var(--cds-border);border-radius:10px;background:var(--color-panel);color:var(--color-fg);cursor:pointer}
+.gx-maintabs button[aria-selected="true"]{background:#8e1b1c;border-color:#8e1b1c;color:#fff}
+#tab-trade,#tab-hospital{display:flex;flex-direction:column;gap:var(--cds-gap-lg)}
+#tab-trade[hidden],#tab-hospital[hidden]{display:none}
+.gx-ctrl input[type=search]{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:12rem}
+#hs-wrap{display:flex;gap:8px;height:520px}
+#hs-area{flex:1;min-width:0}
+#hs-box{height:100%;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#hs-lp{width:300px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
+#hs-ul{list-style:none;margin:0;padding:0}
+#hs-ul li{padding:.5rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
+#hs-ul li:hover,#hs-ul li.on{background:var(--color-panel)}
+#hs-ul .nm{font-weight:var(--cds-font-weight-medium)}
+#hs-ul small{display:block;color:var(--color-fg-muted);font-size:11px}
+#hs-ul li.nol{color:var(--color-fg-muted);cursor:default}
+.hs-pop{padding:8px 10px;font-size:12px;line-height:1.5;min-width:180px;max-width:260px;color:#202227}
+.hs-pop b{display:block;font-size:13px}
+@media (max-width:720px){#hs-wrap{flex-direction:column;height:auto}#hs-area{height:420px;flex:none}#hs-lp{width:auto;max-height:14rem}}
+@media print{#tab-hospital,#main-tabs{display:none!important}#tab-trade{gap:.7rem}}
 </style></head>
 <body><div class="wrap">
 <div id="login" class="gx-login" hidden>
@@ -241,6 +261,11 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 <div class="pf"><div class="pf-h"><div class="sp"></div></div><div class="pf-b">
 <div class="gx-page" id="app" hidden>
   <header class="gx-site no-print"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#fff" stroke-width="2.4" stroke-linejoin="miter"/></svg><h1>아이파크자이 한산(234-1234)공인중개사사무소</h1></header>
+  <nav class="gx-maintabs no-print" id="main-tabs" role="tablist" aria-label="메뉴">
+    <button type="button" role="tab" id="mt-trade" data-t="trade" aria-selected="true">실거래가 조회</button>
+    <button type="button" role="tab" id="mt-hospital" data-t="hospital" aria-selected="false">병원검색</button>
+  </nav>
+<div id="tab-trade" role="tabpanel" aria-labelledby="mt-trade">
 
   <section class="gx-card gx-ctrl no-print" aria-label="조회 조건">
     <div class="gx-row">
@@ -331,6 +356,31 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       </section>
     </div>
   </div>
+</div><!-- /tab-trade -->
+<div id="tab-hospital" role="tabpanel" aria-labelledby="mt-hospital" hidden>
+  <section class="gx-card gx-ctrl no-print" aria-label="병원 검색 조건">
+    <div class="gx-row">
+      <label>시군구<select id="hs-region"></select></label>
+      <label>종별<select id="hs-cl">
+        <option value="">전체</option><option value="01">상급종합</option><option value="11">종합병원</option><option value="21">병원</option><option value="28">요양병원</option><option value="29">정신병원</option><option value="31">의원</option><option value="41">치과병원</option><option value="51">치과의원</option><option value="92">한방병원</option><option value="93">한의원</option><option value="71">보건소</option>
+      </select></label>
+      <label>진료과목<select id="hs-dg">
+        <option value="">전체</option><option value="01">내과</option><option value="02">신경과</option><option value="03">정신건강의학과</option><option value="04">외과</option><option value="05">정형외과</option><option value="06">신경외과</option><option value="08">성형외과</option><option value="09">마취통증의학과</option><option value="10">산부인과</option><option value="11">소아청소년과</option><option value="12">안과</option><option value="13">이비인후과</option><option value="14">피부과</option><option value="15">비뇨의학과</option><option value="16">영상의학과</option><option value="21">재활의학과</option><option value="23">가정의학과</option><option value="24">응급의학과</option><option value="49">치과</option><option value="80">한방내과</option>
+      </select></label>
+      <label>병원명<input id="hs-name" type="search" maxlength="40" placeholder="일부만 입력해도 됩니다" autocomplete="off"></label>
+    </div>
+    <div class="gx-row"><button id="hs-go" type="button">검색</button><span id="hs-status" class="gx-note"></span></div>
+  </section>
+
+  <section class="gx-card no-print" id="hs-card" aria-label="병원 검색 결과" hidden>
+    <h2 id="hs-h">검색 결과</h2>
+    <p class="gx-note" id="hs-note"></p>
+    <div id="hs-wrap">
+      <aside id="hs-lp" aria-label="병원 목록"><ul id="hs-ul"></ul></aside>
+      <div id="hs-area"><div id="hs-box"></div></div>
+    </div>
+  </section>
+</div>
 </div>
 </div><div class="pf-f"><div class="sp"></div></div></div>
 </div>
@@ -1845,4 +1895,5 @@ function infoRender() {
   ].map((t) => mk('li', t)));
 }
 
-</script></body></html>
+</script>
+<script src="/hospital.js"></script></body></html>
