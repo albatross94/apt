@@ -27,8 +27,8 @@
   function init() {
     if (!sc.ready) {
       sc.ready = Promise.all([get({ kind: 'schools' })]).then(([j]) => {
-        sc.near = j.nearM; sc.schools = j.schools; sc.district = j.district; sc.meta = j.meta;
-        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다.`;
+        sc.near = j.nearM; sc.zoneDate = j.addrZone ? j.addrZone.date : ''; sc.schools = j.schools; sc.district = j.district; sc.meta = j.meta;
+        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다. ${j.addrZone ? ` 통학구역 주소표 ${j.addrZone.date}, 기준일이 달라 차이가 날 수 있음(수원교육지원청 자료).` : ''}`;
       });
       sc.ready.catch(() => { sc.ready = null; });
     }
@@ -182,6 +182,13 @@
     else s.textContent = `경계에서 ${sc.near}m 넘게 떨어져 있어 판정은 안정적입니다. 그래도 실제 배정은 관할 교육지원청에서 확인해 주세요.`;
     const upd = [...new Set(['elem', 'mid', 'high'].flatMap((k) => L.levels[k].inside.map((d) => `${d.nm} ${d.upd}`)))];
     box.append(s, el('p', 'gx-note', `학구 변경일: ${upd.join(' · ')}`));
+    const Z = L.addrZone;
+    if (Z) {
+      const names = Z.found ? [...new Set(Z.rows.map((r) => r.school + (r.temp ? '(임시 통학구역 표기)' : '')))].join(', ') : '';
+      box.append(el('p', Z.found && Z.match === false ? 'sc-warn' : 'gx-note', Z.found
+        ? `수원교육지원청 통학구역 주소표(${Z.date}): ${names} — 초등 판정과 ${Z.match === false ? '다름, 기준일 차이 가능' : Z.match ? '같음' : '비교하지 못함'}. 기준일이 달라 차이가 날 수 있습니다.`
+        : `수원교육지원청 통학구역 주소표(${Z.date})에서 이 주소를 찾지 못했습니다. 주소표와는 비교하지 못했습니다.`));
+    }
   }
 
   /* ----- 단지 동별 표 ----- */
@@ -195,6 +202,10 @@
       tr.append(el('td', 'l', d.동), el('td', 'l', nm(d.초등학구)), el('td', 'l', nm(d.중학구)), el('td', 'l', nm(d.고교구역)));
       const st = el('td', 'l'); st.append(el('span', d.확인필요 ? 'sc-chk' : 'sc-ok', d.상태));
       if (d.확인필요) { st.append(el('br'), el('small', '', `${TEL}에 확인`)); st.title = (d.사유 || []).join(' / '); }
+      const z = d.주소표;
+      if (z && z.학교 && z.학교.length) {
+        st.append(el('br'), el('small', '', `주소표(${z.기준일}) ${z.학교.join(', ')}${z.임시표기 ? '(임시 통학구역 표기)' : ''}: ${z.일치 ? '일치' : '다름, 기준일 차이 가능'}`));
+      }
       tr.append(st);
       if (d.위도 != null) { tr.style.cursor = 'pointer'; tr.onclick = async () => { await ensureMap(); sc.map.setLevel(4); sc.map.panTo(new kakao.maps.LatLng(d.위도, d.경도)); }; }
       tb.append(tr);
@@ -211,10 +222,10 @@
       const inSuwon = (r) => /수원/.test(r.address_name || r.address?.address_name || '');
       new svc.Geocoder().addressSearch(q, (res, st) => {
         const hit = st === svc.Status.OK && res.find(inSuwon);
-        if (hit) return ok({ lat: Number(hit.y), lng: Number(hit.x), label: hit.road_address ? hit.road_address.address_name : hit.address_name });
+        if (hit) return ok({ lat: Number(hit.y), lng: Number(hit.x), label: hit.road_address ? hit.road_address.address_name : hit.address_name, jibun: hit.address ? hit.address.address_name : '', road: hit.road_address ? hit.road_address.address_name : '' });
         new svc.Places().keywordSearch(q, (r2, st2) => {
           const h2 = st2 === svc.Status.OK && r2.find(inSuwon);
-          ok(h2 ? { lat: Number(h2.y), lng: Number(h2.x), label: `${h2.place_name} (${h2.road_address_name || h2.address_name})` } : null);
+          ok(h2 ? { lat: Number(h2.y), lng: Number(h2.x), label: `${h2.place_name} (${h2.road_address_name || h2.address_name})`, jibun: h2.address_name || '', road: h2.road_address_name || '' } : null);
         }, { location: new kakao.maps.LatLng(37.2705, 127.0205), radius: 20000 });
       });
     });
@@ -258,7 +269,7 @@
         if (my !== sc.seq) return;
         if (!p) { rows = []; title = `${guLabel} · “${q}” — 찾지 못했습니다`; $('sc-note').textContent = '학교 이름이나 수원시 안의 단지명·주소로 찾아 보세요. 주소는 도로명(예: 인계로 21)이나 지번(예: 인계동 257-2)을 쓸 수 있습니다.'; }
         else {
-          const L = await get({ kind: 'locate', lat: p.lat, lng: p.lng });
+          const L = await get({ kind: 'locate', lat: p.lat, lng: p.lng, jibun: p.jibun || '', road: p.road || '' });
           judge = L; jtitle = `${p.label} 기준`; from = p; rows = nearby(p.lat, p.lng, lv); pts = [{ lat: p.lat, lng: p.lng }];
           title = `“${q}” 주변 — 학구 판정과 ${NEAR_KM}km 안 학교 ${rows.length}곳`;
         }
