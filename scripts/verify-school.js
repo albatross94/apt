@@ -45,6 +45,31 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
   ok(south && dsch[south.id].some((s) => s.nm === '수원중학교'), '남부중학군에 수원중학교 포함');
   ok(east && !dsch[east.id].some((s) => s.nm === '수원중학교'), '동부중학군에는 수원중학교 없음');
   lines.push('## 연계정보', `- 남부중학군 ${south && dsch[south.id].length}개교: ${south && dsch[south.id].map((s) => s.nm).join(', ')}`, `- 동부중학군 ${east && dsch[east.id].length}개교: ${east && dsch[east.id].map((s) => s.nm).join(', ')}`, '');
+  // 수원교육지원청 통학구역 주소표(2024-10-08)와 동별 초등 판정 대조 (표 파일이 있을 때만; 정보 제공용, 통과/실패에 넣지 않는다)
+  const TABLE = path.join(ROOT, '학교', '경기도교육청 경기도수원교육지원청_통합홈페이지_통학구역_20241008.csv'), TABLE_DATE = '2024-10-08';
+  if (fs.existsSync(TABLE) && fs.existsSync(path.join(ROOT, 'data', 'school', 'complex_district.json'))) {
+    const rowsT = require('../lib/geo').readCsv(TABLE, 'euc-kr').filter((r) => /수원센트럴아이파크자이/.test(r['건물명']));
+    const byDong = new Map();
+    for (const r of rowsT) {
+      const m = r['건물명'].match(/(\d+)동\s*~\s*(\d+)동/);
+      const school = r['학교명'].replace(/\(.*\)/, '').trim(), temp = (r['학교명'].match(/\((.*)\)/) || [])[1] || '';
+      if (!m) continue;
+      for (let n = +m[1]; n <= +m[2]; n++) byDong.set(n + '동', { school, temp, raw: r['학교명'], row: r['건물명'] });
+    }
+    const C = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'school', 'complex_district.json'), 'utf8'));
+    lines.push(`## 수원교육지원청 통학구역 주소표(기준일 ${TABLE_DATE}) ↔ 동별 초등 판정(학구도 ${C.기준.학구도})`, '', `- 주소표 행(팔달구 인계로 21 / 인계동 847-3): ${rowsT.map((r) => `"${r['건물명']}" → ${r['학교명']}`).join(' ; ')}`, '- 좌표 판정은 한국교육시설안전원 학구도(2026-09-20), 주소표는 수원교육지원청 자료(2024-10-08)로 기준일이 다르다. 임시 통학구역 표기가 있는 행은 비고에 적는다. 불일치는 임의로 맞추지 않고 그대로 표시한다.', '', '| 동 | 주소표 학교 | 좌표 판정(초등) | 일치 | 비고 |', '|---|---|---|---|---|');
+    let mis = 0, nf = 0;
+    for (const d of C.dongs) {
+      const t = byDong.get(d.동), el = d.초등학구.map((x) => x.이름.replace('통학구역', '')).join('/') || '-';
+      if (!t) { nf++; lines.push(`| ${d.동} | (주소표에 없음) | ${el} | - | [확인 필요] |`); continue; }
+      const same = d.초등학구.length === 1 && el === t.school;
+      if (!same) mis++;
+      lines.push(`| ${d.동} | ${t.school} | ${el} | ${same ? '일치' : '**불일치**'} | ${[t.temp && `주소표: "${t.raw}"`, !same && '기준일 차이 가능(주소표 2024-10-08 / 학구도 2026-09-20), 교육지원청 확인'].filter(Boolean).join(' · ')} |`);
+    }
+    lines.push('', `- 주소표 행이 없는 동 ${nf}개, 불일치 ${mis}개 (${C.dongs.filter((d) => { const t = byDong.get(d.동); return t && !(d.초등학구.length === 1 && d.초등학구[0].이름.replace('통학구역', '') === t.school); }).map((d) => d.동).join(', ') || '없음'})`, '');
+    console.log(`
+[주소표 대조] 불일치 ${mis}개, 주소표 없음 ${nf}개`);
+  }
   lines.push(`## 결과: 통과 ${pass} / 실패 ${failN}`, '');
   console.log(`\n통과 ${pass} / 실패 ${failN}`);
   fs.writeFileSync(path.join(ROOT, 'data', 'school', 'verification_auto.md'), lines.join('\n'));
