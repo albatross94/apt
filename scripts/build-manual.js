@@ -4,7 +4,7 @@ const g = require('../lib/geo');
 const D = path.join(__dirname, '..', 'data', 'school');
 const J = JSON.parse(fs.readFileSync(path.join(D, 'sw_judge.json'), 'utf8'));
 const C = JSON.parse(fs.readFileSync(path.join(D, 'complex_district.json'), 'utf8'));
-const WANT = ['101동', '102동', '103동', '104동', '105동', '106동', '107동', '108동', '112동'];
+const WANT = ['101동', '102동', '103동', '104동', '105동', '106동', '107동', '108동', '111동', '112동', '113동'];   // 확인필요 11개 동 (경계 60m 이내)
 const REP = { 동: '대표점(인계로 21)', 위도: 37.2703753379, 경도: 127.0212229456 };   // 카카오 주소검색 좌표
 
 function judge(lat, lng) {
