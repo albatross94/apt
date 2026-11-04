@@ -101,15 +101,53 @@
     if (sc.hl.length) sc.map.setBounds(bounds);
   }
 
+  // 같은 좌표이거나 5m 이내인 학교(같은 부지의 초·중·고 등)는 마커 하나로 합쳐 "학교 N곳"으로 보여 준다
+  const MERGE_M = 5;
+  function groupRows(rows) {
+    const used = new Set(), groups = [];
+    rows.forEach((s, i) => {
+      if (used.has(i)) return;
+      const g = [i]; used.add(i);
+      rows.forEach((t, j) => { if (!used.has(j) && km(s.lat, s.lng, t.lat, t.lng) * 1000 <= MERGE_M) { g.push(j); used.add(j); } });
+      groups.push(g);
+    });
+    return groups;
+  }
+  function groupPin(n, key) {   // 여러 학교: 숫자가 든 원. 학교급이 모두 같으면 그 색, 섞이면 회색
+    const k = `g${n}${key}`;
+    if (!sc.pins[k]) {
+      const c = COLOR[key] || '#555';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="${c}" stroke="#fff" stroke-width="2.5"/><circle cx="19" cy="19" r="13" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 2"/><text x="19" y="24.5" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="sans-serif">${n}</text></svg>`;
+      sc.pins[k] = new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), new kakao.maps.Size(38, 38), { offset: new kakao.maps.Point(19, 19) });
+    }
+    return sc.pins[k];
+  }
+  function openGroupPop(idxs) {
+    closePop();
+    const s0 = sc.rows[idxs[0]];
+    const w = el('div'); w.style.cssText = 'background:#fff;border:1px solid #8e1b1c;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.25);margin-bottom:26px';
+    const d = el('div', 'sc-pop'); d.append(el('b', '', `학교 ${idxs.length}곳`));
+    for (const i of idxs) {
+      const s = sc.rows[i], b = el('button', '', `${s.nm} (${s.lv === '고등' ? '고' : s.lv === '초등' ? '초' : '중'})`);
+      b.type = 'button'; b.style.cssText = 'display:block;width:100%;text-align:left;font:inherit;font-size:12px;padding:3px 0;border:0;background:none;color:#8e1b1c;cursor:pointer;text-decoration:underline';
+      b.onclick = () => pick(i, false);
+      d.append(b);
+    }
+    w.append(d);
+    sc.pop = new kakao.maps.CustomOverlay({ map: sc.map, position: new kakao.maps.LatLng(s0.lat, s0.lng), content: w, yAnchor: 1, zIndex: 12 });
+  }
   function setMarkers(rows, fit) {
     clear(sc.markers); closePop();
     const bounds = new kakao.maps.LatLngBounds(); let n = 0;
-    rows.forEach((s, i) => {
-      const pos = new kakao.maps.LatLng(s.lat, s.lng);
-      const m = new kakao.maps.Marker({ map: sc.map, position: pos, title: s.nm, image: pinFor(s.lv), zIndex: 1 });
-      kakao.maps.event.addListener(m, 'click', () => pick(i, false));
+    for (const g of groupRows(rows)) {
+      const s = rows[g[0]], pos = new kakao.maps.LatLng(s.lat, s.lng);
+      const lvs = [...new Set(g.map((i) => LVKEY[rows[i].lv]))];
+      const m = g.length === 1
+        ? new kakao.maps.Marker({ map: sc.map, position: pos, title: s.nm, image: pinFor(s.lv), zIndex: 10 })
+        : new kakao.maps.Marker({ map: sc.map, position: pos, title: `학교 ${g.length}곳: ${g.map((i) => rows[i].nm).join(', ')}`, image: groupPin(g.length, lvs.length === 1 ? lvs[0] : 'mix'), zIndex: 11 });
+      kakao.maps.event.addListener(m, 'click', () => (g.length === 1 ? pick(g[0], false) : openGroupPop(g)));
       sc.markers.push(m); bounds.extend(pos); n++;
-    });
+    }
     sc.map.relayout();
     if (fit && n) sc.map.setBounds(bounds);
   }
@@ -118,8 +156,9 @@
     for (const p of pts) {
       const pos = new kakao.maps.LatLng(p.lat, p.lng);
       if (p.label) {
-        const e = el('div', '', p.label); e.style.cssText = 'background:#8e1b1c;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600;border:1px solid #fff;white-space:nowrap';
-        sc.pt.push(new kakao.maps.CustomOverlay({ map: sc.map, position: pos, content: e, yAnchor: 1.2, zIndex: 4 }));
+        // 동 표시는 모서리가 각진 작은 네모(학교는 동그란 핀)라 모양으로 구분된다. 학교 마커보다 아래에 그린다.
+        const e = el('div', '', p.label); e.style.cssText = 'background:#fff;color:#8e1b1c;border-radius:2px;padding:0 4px;font-size:10px;font-weight:700;border:1.5px solid #8e1b1c;white-space:nowrap;line-height:14px;pointer-events:none';
+        sc.pt.push(new kakao.maps.CustomOverlay({ map: sc.map, position: pos, content: e, yAnchor: 0.5, zIndex: 2 }));
       } else sc.pt.push(new kakao.maps.Marker({ map: sc.map, position: pos, zIndex: 4 }));
     }
   }
@@ -291,6 +330,7 @@
       }
       renderList(rows, from);
       const dets = [];
+      if (rows.length) dets.push('지도의 동그란 핀은 학교(파랑 초등·초록 중·빨강 고등), 숫자 핀은 같은 부지의 학교 여러 곳' + (pts.length ? ', 흰 네모는 단지 동' : '') + '입니다.');
       if (from) dets.push('학교 옆 숫자는 기준 지점으로부터의 직선거리입니다. 가까운 학교가 배정 학교라는 뜻은 아닙니다.');
       if (!q && rows.length) dets.push('학교를 누르면 그 학교가 속한 학구가 지도에 표시됩니다.');
       $('sc-note').textContent = $('sc-note').textContent || dets.join(' ');
@@ -299,7 +339,7 @@
         await ensureMap();
         if (my !== sc.seq) return;
         clear(sc.hl); setMarkers(rows, !pts.length); setPoints(pts);
-        if (pts.length) { const b = new kakao.maps.LatLngBounds(); for (const p of pts) b.extend(new kakao.maps.LatLng(p.lat, p.lng)); for (const s of rows.slice(0, 8)) b.extend(new kakao.maps.LatLng(s.lat, s.lng)); sc.map.setBounds(b); }
+        if (pts.length) { const b = new kakao.maps.LatLngBounds(); for (const p of pts) b.extend(new kakao.maps.LatLng(p.lat, p.lng)); for (const s of rows) b.extend(new kakao.maps.LatLng(s.lat, s.lng)); sc.map.setBounds(b); }
       } catch (e) { $('sc-note').textContent += ' 지도를 표시하지 못했습니다: ' + e.message; }
     } catch (e) {
       if (my === sc.seq) status.textContent = e.message;
