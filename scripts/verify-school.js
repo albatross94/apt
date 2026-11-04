@@ -59,7 +59,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
     const same = zoneMatches(rowsZ, d.초등학구.map((x) => ({ schools: x.학교.map((nm) => ({ nm, lv: '초등' })) })));
     if (!same) { mis++; misList.push(d.동); if (d.상태 === '확인필요') misUp++; }
     const raw = rowsZ.map((r) => r.school + (r.temp ? '(임시 통학구역 표기)' : '')).join(', ');
-    lines.push(`| ${d.동} | ${raw} | ${el} | ${same ? '일치' : '**불일치**'} | ${d.상태} | ${[!same && ZONE_REASON(zmeta.date), rowsZ.some((r) => r.temp) && '주소표에 임시 통학구역 표기(매교초 개교 전)'].filter(Boolean).join(' · ')} |`);
+    lines.push(`| ${d.동} | ${raw} | ${el} | ${same ? '일치' : '**불일치**'} | ${d.상태} | ${[!same && ZONE_REASON(zmeta.date), d.주소표.비고].filter(Boolean).join(' · ')} |`);
   }
   lines.push('', `- 주소표 행이 없는 동 ${nf}개, 불일치 ${mis}개 (${misList.join(', ') || '없음'}), 불일치 중 화면 상태가 확인필요인 동 ${misUp}개`, '');
   ok(misUp === mis, `주소표와 다른 동은 모두 화면에서 확인필요 (${misUp}/${mis})`);

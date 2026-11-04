@@ -12,7 +12,7 @@ try {
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
 } catch {}
-const { locate, NEAR_M, zoneByDong, zoneMatches, ZONE_REASON } = require('../lib/school');
+const { locate, NEAR_M, zoneByDong, zoneMatches, zoneTempNote, ZONE_REASON } = require('../lib/school');
 const ZONE_DATE = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'school', 'sw_addr_zone_meta.json'), 'utf8')).date;
 
 const COMPLEX = '수원센트럴아이파크자이';
@@ -86,7 +86,7 @@ async function findDong(n) {
     // 수원교육지원청 통학구역 주소표(초등)와 비교. 다르면 확인필요로만 올리고 좌표 판정은 바꾸지 않는다.
     const zr = zoneByDong(COMPLEX, Number(d.동.replace('동', '')));
     const zMatch = zr ? zoneMatches(zr, L.levels.elem.inside) : null;
-    const 주소표 = zr ? { 기준일: ZONE_DATE, 학교: [...new Set(zr.map((r) => r.school))], 임시표기: zr.some((r) => r.temp), 건물명: zr[0].building, 일치: zMatch } : { 기준일: ZONE_DATE, 학교: [], 일치: null };
+    const 주소표 = zr ? { 기준일: ZONE_DATE, 학교: [...new Set(zr.map((r) => r.school))], 임시표기: zr.some((r) => r.temp), 건물명: zr[0].building, 일치: zMatch, 비고: zoneTempNote(zr, L.levels.elem.inside) } : { 기준일: ZONE_DATE, 학교: [], 일치: null };
     const check = L.check || d.확인필요 || zMatch === false, why = [...L.reasons, ...(zMatch === false ? [`초등 통학구역: ${ZONE_REASON(ZONE_DATE)}`] : []), ...(d.확인필요 && d.사유 ? [d.사유] : [])];
     return { 동: d.동, 위도: d.위도, 경도: d.경도, 초등학구: pick('elem'), 중학구: pick('mid'), 고교구역: pick('high'), 주소표, 경계거리_m: { 초등: L.levels.elem.near, 중: L.levels.mid.near, 고: L.levels.high.near, 최소: dists.length ? Math.min(...dists) : null }, 상태: check ? '확인필요' : '확정', 확인필요: check, 사유: why };
   });

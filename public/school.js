@@ -316,6 +316,7 @@
     const Z = L.addrZone;
     if (Z) {
       const names = Z.found ? [...new Set(Z.rows.map((r) => r.school + (r.temp ? '(임시 통학구역 표기)' : '')))].join(', ') : '';
+      if (Z.tempNote) box.append(el('p', 'sc-warn', Z.tempNote));
       box.append(el('p', Z.found && Z.match === false ? 'sc-warn' : 'gx-note', Z.found
         ? `수원교육지원청 통학구역 주소표(${Z.date}): ${names} — 초등 판정과 ${Z.match === false ? '다름, 기준일 차이 가능' : Z.match ? '같음' : '비교하지 못함'}. 기준일이 달라 차이가 날 수 있습니다.`
         : `수원교육지원청 통학구역 주소표(${Z.date})에서 이 주소를 찾지 못했습니다. 주소표와는 비교하지 못했습니다.`));
@@ -336,7 +337,8 @@
       if (d.확인필요) { st.append(el('br'), el('small', '', `${TEL}에 확인`)); st.title = (d.사유 || []).join(' / '); }
       const z = d.주소표;
       if (z && z.학교 && z.학교.length) {
-        st.append(el('br'), el('small', '', `주소표(${z.기준일}) ${z.학교.join(', ')}${z.임시표기 ? '(임시 통학구역 표기)' : ''}: ${z.일치 ? '일치' : '다름, 기준일 차이 가능'}`));
+        // 임시 표기 행은 같은 문구 규칙(비고)을 쓰고, 그 밖에는 일치 여부만 적는다
+        st.append(el('br'), el('small', '', z.비고 ? z.비고 : `주소표(${z.기준일}) ${z.학교.join(', ')}: ${z.일치 ? '일치' : '다름, 기준일 차이 가능'}`));
       }
       tr.append(st);
       if (d.위도 != null) { tr.className = 'sc-pickrow'; tr.title = '누르면 이 동 기준 소속 학교를 보여 줍니다 (다시 누르면 대표점 기준)'; tr.onclick = () => selectDong(d.동); }
