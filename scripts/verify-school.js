@@ -64,6 +64,40 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
   lines.push('', `- 주소표 행이 없는 동 ${nf}개, 불일치 ${mis}개 (${misList.join(', ') || '없음'}), 불일치 중 화면 상태가 확인필요인 동 ${misUp}개`, '');
   ok(misUp === mis, `주소표와 다른 동은 모두 화면에서 확인필요 (${misUp}/${mis})`);
   console.log(`\n[주소표 대조] 불일치 ${mis}개(${misList.join(',')}), 주소표 없음 ${nf}개`);
+  // 2027학년도 중학군 개정(안) ↔ 학구도 좌표 판정 중학군 (개정안은 확정 아님. 통·반 예외는 이 표만으로 동에 적용할 수 없다)
+  const pf = path.join(ROOT, 'data', 'school', 'sw_mid_plan2027.json');
+  if (fs.existsSync(pf)) {
+    const PL = JSON.parse(fs.readFileSync(pf, 'utf8')), C2 = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'school', 'complex_district.json'), 'utf8'));
+    const shortE = (n) => n.replace(/등학교$/, ''), shortM = (n) => n.replace(/중학군$/, '');
+    // 초등학교 → 개정안 중학군: 원칙(그 밖의 지역 포함)과 일부 지역 예외로 나눈다
+    const planOf = (school) => {
+      const es = PL.초등학교_중학군[school] || [];
+      const main = es.filter((e) => e.종류 === '원칙' || e.지역 === '그 밖의 지역(원칙)').map((e) => e.중학군);
+      const exc = es.filter((e) => e.종류 !== '원칙' && e.지역 && e.지역 !== '그 밖의 지역(원칙)').map((e) => ({ 중학군: e.중학군, 지역: e.지역 }));
+      return { es, main, exc };
+    };
+    lines.push(`## 2027학년도 중학군 개정(안) ↔ 학구도(${C2.기준.학구도}) 중학군 — **확정 아님, 기준 학년도 2027**`, '', `- 자료: ${PL.meta.제목}(${PL.meta.파일}). 개정안이며 확정이 아니다. "일부 통·반 예외"는 단지 동이 해당 통·반에 속하는지 알 수 없어 적용하지 않았다 [확인 필요].`, '- 비교 방법: 동의 초등 판정 학교 → 개정안 표의 중학군 → 학구도 좌표 판정 중학군과 비교. "일치"는 학구도 중학군이 개정안의 원칙 중학군과 같다는 뜻.', '', '| 동 | 초등 판정 | 개정안(2027) 중학군 | 학구도 중학군 | 비교 | 비고(확인필요 사유 후보) |', '|---|---|---|---|---|---|');
+    const sum = new Map();
+    for (const d of C2.dongs) {
+      const es = d.초등학구.flatMap((x) => x.학교), sch = es[0] || '';
+      const P = planOf(sch), cur = d.중학구.map((x) => x.이름);
+      const planTxt = P.es.length ? `${P.main.join(', ') || '-'}${P.exc.length ? ' (예외: ' + P.exc.map((x) => `${shortM(x.중학군)} ← ${x.지역}`).join('; ') + ')' : ''}` : '(개정안 표에 없음)';
+      let cmp = '비교 불가', note = '';
+      if (P.es.length) {
+        if (P.main.some((m) => cur.includes(m))) cmp = '일치';
+        else if (P.exc.some((x) => cur.includes(x.중학군))) cmp = '예외 지역 해당 시에만 일치 [확인 필요]';
+        else cmp = '**불일치**';
+        if (cmp !== '일치') note = `개정안(2027학년도)은 ${shortE(sch)}=${P.main.map(shortM).join('·')}${P.exc.length ? ', 일부 통반 예외' : ''}`;
+      }
+      lines.push(`| ${d.동} | ${shortE(sch)} | ${planTxt} | ${cur.join(', ')} | ${cmp} | ${note}${d.확인필요 ? '' : (note ? ' · 현재 상태 확정 → 확인필요 검토 대상' : '')} |`);
+      const k = `${shortE(sch)}|${planTxt}|${cur.join(', ')}|${cmp}`; (sum.get(k) || sum.set(k, []).get(k)).push(d.동);
+    }
+    lines.push('', '요약:', '', '| 초등 판정 | 개정안 중학군 | 학구도 중학군 | 비교 | 동 수 | 동 |', '|---|---|---|---|---|---|');
+    for (const [k, v] of sum) { const [a, b, c, e] = k.split('|'); lines.push(`| ${a} | ${b} | ${c} | ${e} | ${v.length} | ${v[0]}~${v[v.length - 1]} |`); }
+    const bad = C2.dongs.filter((d) => { const P = planOf(d.초등학구.flatMap((x) => x.학교)[0] || ''); return P.es.length && !P.main.some((m) => d.중학구.map((x) => x.이름).includes(m)); });
+    lines.push('', `- 개정안과 원칙이 다른 동 ${bad.length}개(${bad.map((d) => d.동).join(', ') || '없음'}) 중 화면 상태가 확인필요인 동 ${bad.filter((d) => d.확인필요).length}개.`, '');
+    console.log(`\n[2027 개정안 대조] 원칙과 다른 동 ${bad.length}개: ${bad.map((d) => d.동).join(',')}`);
+  }
   // 주소표의 "매교초 개교 전 임시" 행 ↔ 학구도 좌표 판정 (build-maegyo-check.js 가 만든 maegyo_check.json 사용)
   const mf = path.join(ROOT, 'data', 'school', 'maegyo_check.json');
   if (fs.existsSync(mf)) {
