@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, '..');
 const NAME = '[게시용] 2027학년도 수원시 중학교 중학군 및 중학구 현황.xlsx';
 const cand = [process.argv[2], path.join(ROOT, '학교', NAME), path.join(os.homedir(), 'Downloads', NAME)].filter(Boolean);
 const SRC = cand.find((f) => fs.existsSync(f));
-if (!SRC) { console.error('xlsx 파일을 찾지 못했습니다:', cand.join(' | ')); process.exit(2); }
+if (!SRC) { console.error('xlsx 파일을 찾지 못했습니다. 원본은 저장소에 올리지 않으므로 "학교" 폴더에 두고 다시 실행하세요:', cand.join(' | ')); process.exit(2); }
 
 const sheet = readXlsx(SRC)[0];
 const cell = (r, c) => String((sheet.rows[r] || [])[c] ?? '').replace(/\s+/g, ' ').trim();   // r: 0부터 (엑셀 행 - 1)
@@ -54,7 +54,7 @@ for (const g of groups) for (const e of g.초등학교) {
   (byElem[e.이름] ||= []).push({ 중학군: g.중학군 === '오목고색중학군' ? g.중학군 : g.중학군, 종류: e.종류 || '원칙', ...(e.지역 ? { 지역: e.지역 } : {}), ...(e.예외 ? { 예외: e.예외 } : {}), ...(e.공동학구 ? { 공동학구: e.공동학구 } : {}), ...(e.비고 ? { 비고: e.비고 } : {}) });
 }
 const out = {
-  meta: { 제목: '2027학년도 수원시 중학교 중학군 및 중학구 개정(안)', 기준학년도: 2027, 상태: '개정(안) — 확정 아님', 파일: NAME, 변환일: new Date().toISOString().slice(0, 10), 주의: '개정안이며 확정이 아니다. 통·반 단위 예외는 이 표만으로 단지 동에 적용할 수 없다 [확인 필요].' },
+  meta: { 출처: '수원교육지원청 2027학년도 중학군 및 중학구 개정(안)', 제목: '2027학년도 수원시 중학교 중학군 및 중학구 개정(안)', 기준학년도: 2027, 상태: '개정(안) — 확정 아님', 파일기준일: '미확인', 게시일: '미확인', 파일: NAME, 변환일: new Date().toISOString().slice(0, 10), 주의: '개정안이며 확정이 아니다. 통·반 단위 예외는 이 표만으로 단지 동에 적용할 수 없다 [확인 필요].' },
   중학군: groups.map((g) => ({ ...g, 초등학교수: g.초등학교.length })),
   초등학교_중학군: byElem,
 };

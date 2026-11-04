@@ -4,3 +4,4 @@ cache/
 start.bat
 server.js
 학교/
+*.xlsx

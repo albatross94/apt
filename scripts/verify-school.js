@@ -76,7 +76,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
       const exc = es.filter((e) => e.종류 !== '원칙' && e.지역 && e.지역 !== '그 밖의 지역(원칙)').map((e) => ({ 중학군: e.중학군, 지역: e.지역 }));
       return { es, main, exc };
     };
-    lines.push(`## 2027학년도 중학군 개정(안) ↔ 학구도(${C2.기준.학구도}) 중학군 — **확정 아님, 기준 학년도 2027**`, '', `- 자료: ${PL.meta.제목}(${PL.meta.파일}). 개정안이며 확정이 아니다. "일부 통·반 예외"는 단지 동이 해당 통·반에 속하는지 알 수 없어 적용하지 않았다 [확인 필요].`, '- 비교 방법: 동의 초등 판정 학교 → 개정안 표의 중학군 → 학구도 좌표 판정 중학군과 비교. "일치"는 학구도 중학군이 개정안의 원칙 중학군과 같다는 뜻.', '', '| 동 | 초등 판정 | 개정안(2027) 중학군 | 학구도 중학군 | 비교 | 비고(확인필요 사유 후보) |', '|---|---|---|---|---|---|');
+    lines.push(`## 중학군 교차검증: ${PL.meta.출처} 표 기준 ↔ 학구도(${C2.기준.학구도}) 중학군 — **확정 아님, 기준 학년도 2027**`, '', `- 출처: ${PL.meta.출처}. 파일 기준일 ${PL.meta.파일기준일}, 게시일 ${PL.meta.게시일}. 개정안 표 기준이며 확정이 아니다. 현행 학구와의 차이(무엇이 바뀌는지)는 확인하지 못했다. "일부 통·반 예외"는 단지 동이 해당 통·반에 속하는지 알 수 없어 적용하지 않았다 [확인 필요].`, '- 비교 방법: 동의 초등 판정 학교 → 개정안 표의 중학군 → 학구도 좌표 판정 중학군과 비교. "일치"는 학구도 중학군이 표의 원칙 중학군과 같다는 뜻.', '', '| 동 | 초등 판정 | 개정안 표(2027, 확정 아님) 중학군 | 학구도 중학군 | 비교 | 비고(확인필요 사유) |', '|---|---|---|---|---|---|');
     const sum = new Map();
     for (const d of C2.dongs) {
       const es = d.초등학구.flatMap((x) => x.학교), sch = es[0] || '';
@@ -87,7 +87,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
         if (P.main.some((m) => cur.includes(m))) cmp = '일치';
         else if (P.exc.some((x) => cur.includes(x.중학군))) cmp = '예외 지역 해당 시에만 일치 [확인 필요]';
         else cmp = '**불일치**';
-        if (cmp !== '일치') note = `개정안(2027학년도)은 ${shortE(sch)}=${P.main.map(shortM).join('·')}${P.exc.length ? ', 일부 통반 예외' : ''}`;
+        if (cmp !== '일치') note = `개정안 표 기준 ${shortE(sch)}=${P.main.map(shortM).join('·')}${P.exc.length ? ', 일부 통반 예외' : ''} (2027학년도, 확정 아님)`;
       }
       lines.push(`| ${d.동} | ${shortE(sch)} | ${planTxt} | ${cur.join(', ')} | ${cmp} | ${note}${d.확인필요 ? '' : (note ? ' · 현재 상태 확정 → 확인필요 검토 대상' : '')} |`);
       const k = `${shortE(sch)}|${planTxt}|${cur.join(', ')}|${cmp}`; (sum.get(k) || sum.set(k, []).get(k)).push(d.동);
@@ -95,7 +95,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
     lines.push('', '요약:', '', '| 초등 판정 | 개정안 중학군 | 학구도 중학군 | 비교 | 동 수 | 동 |', '|---|---|---|---|---|---|');
     for (const [k, v] of sum) { const [a, b, c, e] = k.split('|'); lines.push(`| ${a} | ${b} | ${c} | ${e} | ${v.length} | ${v[0]}~${v[v.length - 1]} |`); }
     const bad = C2.dongs.filter((d) => { const P = planOf(d.초등학구.flatMap((x) => x.학교)[0] || ''); return P.es.length && !P.main.some((m) => d.중학구.map((x) => x.이름).includes(m)); });
-    lines.push('', `- 개정안과 원칙이 다른 동 ${bad.length}개(${bad.map((d) => d.동).join(', ') || '없음'}) 중 화면 상태가 확인필요인 동 ${bad.filter((d) => d.확인필요).length}개.`, '');
+    lines.push('', `- 개정안 표의 원칙과 다른 동 ${bad.length}개(${bad.map((d) => d.동).join(', ') || '없음'}) 중 화면 상태가 확인필요인 동 ${bad.filter((d) => d.확인필요).length}개.`, '');
     console.log(`\n[2027 개정안 대조] 원칙과 다른 동 ${bad.length}개: ${bad.map((d) => d.동).join(',')}`);
   }
   // 주소표의 "매교초 개교 전 임시" 행 ↔ 학구도 좌표 판정 (build-maegyo-check.js 가 만든 maegyo_check.json 사용)
