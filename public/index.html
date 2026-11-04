@@ -229,8 +229,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-maintabs{display:flex;gap:.4rem;flex-wrap:wrap}
 .gx-maintabs button{font:inherit;font-weight:var(--cds-font-weight-medium);padding:.6rem 1.3rem;border:1px solid var(--cds-border);border-radius:10px;background:var(--color-panel);color:var(--color-fg);cursor:pointer}
 .gx-maintabs button[aria-selected="true"]{background:#8e1b1c;border-color:#8e1b1c;color:#fff}
-#tab-trade,#tab-hospital{display:flex;flex-direction:column;gap:var(--cds-gap-lg)}
-#tab-trade[hidden],#tab-hospital[hidden]{display:none}
+#tab-trade,#tab-hospital,#tab-school{display:flex;flex-direction:column;gap:var(--cds-gap-lg)}
+#tab-trade[hidden],#tab-hospital[hidden],#tab-school[hidden]{display:none}
 .gx-ctrl input[type=search]{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:12rem}
 #hs-wrap{display:flex;gap:8px;height:520px}
 #hs-area{position:relative;flex:1;min-width:0}
@@ -256,7 +256,30 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .hs-hrs .hs-etc{margin-top:2px;color:#202227}
 .hs-hrs small{display:block;color:#5f5a54;font-size:10px}
 @media (max-width:720px){#hs-wrap{flex-direction:column;height:auto}#hs-area{height:420px;flex:none}#hs-lp{width:auto;max-height:14rem}}
-@media print{#tab-hospital,#main-tabs{display:none!important}#tab-trade{gap:.7rem}}
+/* 학교검색 */
+#sc-wrap{display:flex;gap:8px;height:520px}
+#sc-lp{width:340px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
+#sc-box{flex:1;min-width:0;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#sc-ul{list-style:none;margin:0;padding:0}
+#sc-ul li{padding:.55rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
+#sc-ul li:hover,#sc-ul li.on{background:var(--color-panel)}
+#sc-ul .nm{font-weight:var(--cds-font-weight-medium)}
+#sc-ul small{display:block;color:var(--color-fg-muted);font-size:12px;line-height:1.5}
+#sc-ul li.nol{color:var(--color-fg-muted);cursor:default}
+#sc-ul a{color:#8e1b1c}
+.sc-lv{display:inline-block;font-size:11px;padding:0 .4rem;margin-left:.3rem;border-radius:6px;border:1px solid var(--color-border-line);color:var(--color-fg-muted);font-weight:400}
+.sc-layers{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center}
+.sc-layers label{display:inline-flex;gap:.35rem;align-items:center;cursor:pointer}
+.sc-sw{display:inline-block;width:.9rem;height:.9rem;border-radius:3px}
+.sc-warn{background:#fff3dc;border:1px solid #f0d49a;color:#7a4b00;border-radius:8px;padding:.5rem .7rem;font-size:var(--cds-font-size-caption);line-height:1.55}
+.sc-ok{color:#1f6b3b;font-weight:var(--cds-font-weight-medium)}
+.sc-chk{color:#a05a00;font-weight:var(--cds-font-weight-medium)}
+.sc-notice{margin:0;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);line-height:1.6}
+#tab-school .gx-table td,#tab-school .gx-table th{text-align:left}
+.sc-pop{padding:8px 10px;font-size:12px;line-height:1.5;min-width:170px;max-width:240px;color:#202227}
+.sc-pop b{display:block;font-size:13px}
+@media (max-width:720px){#sc-wrap{flex-direction:column;height:auto}#sc-lp{width:auto;max-height:16rem}#sc-box{height:420px;flex:none}}
+@media print{#tab-hospital,#tab-school,#main-tabs{display:none!important}#tab-trade{gap:.7rem}}
 </style></head>
 <body><div class="wrap">
 <div id="login" class="gx-login" hidden>
@@ -275,6 +298,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   <nav class="gx-maintabs no-print" id="main-tabs" role="tablist" aria-label="메뉴">
     <button type="button" role="tab" id="mt-trade" data-t="trade" aria-selected="true">실거래가 조회</button>
     <button type="button" role="tab" id="mt-hospital" data-t="hospital" aria-selected="false">병원·약국검색</button>
+    <button type="button" role="tab" id="mt-school" data-t="school" aria-selected="false">학교검색</button>
   </nav>
 <div id="tab-trade" role="tabpanel" aria-labelledby="mt-trade">
 
@@ -391,6 +415,34 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <div id="hs-area"><div id="hs-box"></div><button type="button" id="hs-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
     </div>
   </section>
+</div>
+<div id="tab-school" role="tabpanel" aria-labelledby="mt-school" hidden>
+  <section class="gx-card gx-ctrl no-print" aria-label="학교 검색 조건">
+    <div class="gx-row">
+      <label>시군구<select id="sc-gu"><option value="">수원시 전체</option><option value="팔달구" selected>수원시 팔달구</option><option value="장안구">수원시 장안구</option><option value="권선구">수원시 권선구</option><option value="영통구">수원시 영통구</option></select></label>
+      <label>학교급<select id="sc-lv"><option value="">전체</option><option value="초등">초등학교</option><option value="중">중학교</option><option value="고등">고등학교</option></select></label>
+      <label>학교명·단지명·주소<input id="sc-q" type="search" maxlength="40" placeholder="예: 인계초, 수원센트럴아이파크자이, 인계동 257-2" autocomplete="off"></label>
+    </div>
+    <div class="gx-row"><button id="sc-go" type="button">검색</button><span id="sc-status" class="gx-note"></span></div>
+  </section>
+
+  <section class="gx-card no-print" id="sc-res" aria-label="학교 검색 결과" hidden>
+    <h2 id="sc-h">검색 결과</h2>
+    <div id="sc-judge"></div>
+    <div id="sc-dongs"></div>
+    <p class="gx-note" id="sc-note"></p>
+    <div class="sc-layers" id="sc-layers" role="group" aria-label="학구 경계 표시">
+      <label><input type="checkbox" data-l="elem"><i class="sc-sw" style="background:#2b6cb0"></i>초등 통학구역</label>
+      <label><input type="checkbox" data-l="mid"><i class="sc-sw" style="background:#2e9d5b"></i>중학군</label>
+      <label><input type="checkbox" data-l="high"><i class="sc-sw" style="background:#c0392b"></i>고교구역</label>
+    </div>
+    <div id="sc-wrap">
+      <aside id="sc-lp" aria-label="학교 목록"><ul id="sc-ul"></ul></aside>
+      <div id="sc-box"></div>
+    </div>
+  </section>
+  <p class="sc-notice no-print" id="sc-notice">참고용 안내이며 실제 배정은 관할 교육지원청(수원교육지원청 031-250-1482)에서 확인해 주세요. 학구는 변경될 수 있습니다. 가까운 학교가 배정 학교라는 뜻이 아니며, 표시한 거리는 직선거리입니다.</p>
+  <p class="sc-notice no-print" id="sc-dates"></p>
 </div>
 </div>
 </div><div class="pf-f"><div class="sp"></div></div></div>
@@ -1699,7 +1751,7 @@ function loadKakao() {
       if (!j.kakaoKey) throw new Error('KAKAO_JS_KEY가 설정되지 않았습니다 (로컬은 .env 파일, Vercel은 프로젝트 환경 변수에 추가하세요).');
       await new Promise((ok, no) => {
         const s = document.createElement('script');
-        s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(j.kakaoKey)}&autoload=false`;
+        s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(j.kakaoKey)}&libraries=services&autoload=false`;
         s.onload = ok;
         s.onerror = () => no(new Error('카카오맵을 불러오지 못했습니다. 키와 등록한 사이트 도메인을 확인해 주세요.'));
         document.head.append(s);
@@ -1907,4 +1959,5 @@ function infoRender() {
 }
 
 </script>
-<script src="/hospital.js"></script></body></html>
+<script src="/hospital.js"></script>
+<script src="/school.js"></script></body></html>
