@@ -64,6 +64,35 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); cond 
   lines.push('', `- 주소표 행이 없는 동 ${nf}개, 불일치 ${mis}개 (${misList.join(', ') || '없음'}), 불일치 중 화면 상태가 확인필요인 동 ${misUp}개`, '');
   ok(misUp === mis, `주소표와 다른 동은 모두 화면에서 확인필요 (${misUp}/${mis})`);
   console.log(`\n[주소표 대조] 불일치 ${mis}개(${misList.join(',')}), 주소표 없음 ${nf}개`);
+  // 주소표의 "매교초 개교 전 임시" 행 ↔ 학구도 좌표 판정 (build-maegyo-check.js 가 만든 maegyo_check.json 사용)
+  const mf = path.join(ROOT, 'data', 'school', 'maegyo_check.json');
+  if (fs.existsSync(mf)) {
+    const M = JSON.parse(fs.readFileSync(mf, 'utf8'));
+    lines.push(`## 주소표 "매교초 개교 전 임시" 행(기준일 ${M.기준.주소표}) ↔ 학구도(${M.기준.학구도}) 좌표 판정`, '', `- 추출 조건: 주소표 학교명에 "매교초 개교" 또는 "임시"가 들어간 행 — **${M.rows.length}건**. 좌표 출처: ${M.기준.좌표출처}(건물 중심 여부 미확인, 경계 근처는 핀 위치에 따라 결과가 달라질 수 있음).`, '', '| 지번 | 도로명 | 건물명 | 학교명(주소표) |', '|---|---|---|---|');
+    for (const r of M.rows) lines.push(`| ${r.지번} | ${r.도로명} | ${r.건물명} | ${r.학교명} |`);
+    lines.push('', '단지별 요약 (판정이 매교초통학구역인 비율):', '', '| 단지 | 주소표 행 수 | 동 수 | 좌표 있음 | 좌표 없음 | 판정 = 매교초통학구역 | 비율(좌표 있는 동 기준) | 경계 최소거리(m) |', '|---|---|---|---|---|---|---|---|');
+    const groups = new Map();
+    for (const r of M.rows) { const k = r.건물명.replace(/\s*\d+동.*$/, ''); (groups.get(k) || groups.set(k, []).get(k)).push(r); }
+    for (const [k, rs] of groups) {
+      const ds = rs.flatMap((r) => r.dongs), has = ds.filter((d) => d.좌표), yes = has.filter((d) => d.매교초);
+      const mn = has.length ? Math.min(...has.map((d) => d.경계m)).toFixed(1) : '-';
+      lines.push(`| ${k} | ${rs.length} | ${ds.length} | ${has.length} | ${ds.length - has.length}${ds.length - has.length ? ' (좌표 없음)' : ''} | ${yes.length} | ${has.length ? `${(yes.length / has.length * 100).toFixed(0)}% (${yes.length}/${has.length})` : '-'} | ${mn} |`);
+    }
+    lines.push('', '주소표 행(동 범위)별 판정:', '', '| 건물명 | 주소표 학교 | 동 수 | 좌표 있음 | 판정 = 매교초통학구역 | 비율 | 경계 최소거리(m) |', '|---|---|---|---|---|---|---|');
+    for (const r of M.rows) {
+      const has = r.dongs.filter((d) => d.좌표), yes = has.filter((d) => d.매교초);
+      lines.push(`| ${r.건물명} | ${r.학교명} | ${r.dongs.length} | ${has.length} | ${yes.length} | ${has.length ? `${(yes.length / has.length * 100).toFixed(0)}%` : '-'} | ${has.length ? Math.min(...has.map((d) => d.경계m)).toFixed(1) : '-'} |`);
+    }
+    lines.push('', '동별 상세:', '', '| 단지 | 동 | 위도 | 경도 | 학구도 판정(초등) | 경계까지(m) | 주소표 학교 | 판정=매교초 |', '|---|---|---|---|---|---|---|---|');
+    for (const r of M.rows) {
+      for (const d of r.dongs) {
+        lines.push(d.좌표
+          ? `| ${r.건물명.replace(/\s*\d+동.*$/, '')} | ${d.동} | ${d.위도} | ${d.경도} | ${d.판정} | ${d.경계m} | ${r.주소표학교} | ${d.매교초 ? '예' : '아니오'} |`
+          : `| ${r.건물명.replace(/\s*\d+동.*$/, '')} | ${d.동} | 좌표 없음 | 좌표 없음 | - | - | ${r.주소표학교} | - |`);
+      }
+    }
+    lines.push('');
+  }
   lines.push(`## 결과: 통과 ${pass} / 실패 ${failN}`, '');
   console.log(`\n통과 ${pass} / 실패 ${failN}`);
   fs.writeFileSync(path.join(ROOT, 'data', 'school', 'verification_auto.md'), lines.join('\n'));
