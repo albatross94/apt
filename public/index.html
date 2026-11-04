@@ -260,13 +260,23 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #sc-wrap{display:flex;gap:8px;height:520px}
 #sc-lp{width:340px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
 #sc-box{flex:1;min-width:0;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
-#sc-ul{list-style:none;margin:0;padding:0}
-#sc-ul li{padding:.55rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
-#sc-ul li:hover,#sc-ul li.on{background:var(--color-panel)}
-#sc-ul .nm{font-weight:var(--cds-font-weight-medium)}
-#sc-ul small{display:block;color:var(--color-fg-muted);font-size:12px;line-height:1.5}
+#sc-ul,#sc-near-ul{list-style:none;margin:0;padding:0}
+#sc-ul li,#sc-near-ul li{padding:.55rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
+#sc-ul li:hover,#sc-ul li.on,#sc-near-ul li:hover,#sc-near-ul li.on{background:var(--color-panel)}
+#sc-ul .nm,#sc-near-ul .nm{font-weight:var(--cds-font-weight-medium)}
+#sc-ul small,#sc-near-ul small{display:block;color:var(--color-fg-muted);font-size:12px;line-height:1.5}
 #sc-ul li.nol{color:var(--color-fg-muted);cursor:default}
-#sc-ul a{color:#8e1b1c}
+#sc-ul a,#sc-near-ul a{color:#8e1b1c}
+#sc-ul li.sc-hd{cursor:default;background:var(--color-panel);font-size:12px;font-weight:var(--cds-font-weight-medium);padding:.4rem .7rem;position:sticky;top:0;z-index:1}
+#sc-ul li.sc-hd small{font-weight:400}
+#sc-ul li.sc-hd.cand{border-left:3px dashed var(--color-fg-muted)}
+#sc-ul li.cand:not(.sc-hd){opacity:.78}
+#sc-ul li.sc-hd.top{background:#fff3dc;color:#7a4b00}
+#sc-near{border-top:1px solid var(--color-border-line)}
+#sc-near summary{cursor:pointer;padding:.5rem .7rem;font-size:12px;font-weight:var(--cds-font-weight-medium);color:var(--color-fg-muted)}
+.gx-table tr.sc-pickrow{cursor:pointer}
+.gx-table tr.sc-pickrow:hover,.gx-table tr.sc-pickrow.on{background:var(--color-panel)}
+.gx-table tr.sc-pickrow.on td:first-child{box-shadow:inset 3px 0 #8e1b1c}
 .sc-lv{display:inline-block;font-size:11px;padding:0 .4rem;margin-left:.3rem;border-radius:6px;border:1px solid var(--color-border-line);color:var(--color-fg-muted);font-weight:400}
 .sc-layers{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center}
 .sc-layers label{display:inline-flex;gap:.35rem;align-items:center;cursor:pointer}
@@ -437,7 +447,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <label><input type="checkbox" data-l="high"><i class="sc-sw" style="background:#c0392b"></i>고교구역</label>
     </div>
     <div id="sc-wrap">
-      <aside id="sc-lp" aria-label="학교 목록"><ul id="sc-ul"></ul></aside>
+      <aside id="sc-lp" aria-label="학교 목록"><ul id="sc-ul"></ul><details id="sc-near" hidden><summary>가까운 학교 (직선거리, 참고) — 가까운 학교가 배정 학교는 아닙니다</summary><ul id="sc-near-ul"></ul></details></aside>
       <div id="sc-box"></div>
     </div>
   </section>

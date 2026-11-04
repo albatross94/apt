@@ -16,6 +16,7 @@ const { locate, NEAR_M, zoneByDong, zoneMatches, ZONE_REASON } = require('../lib
 const ZONE_DATE = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'school', 'sw_addr_zone_meta.json'), 'utf8')).date;
 
 const COMPLEX = '수원센트럴아이파크자이';
+const REP = { 주소: '경기 수원시 팔달구 인계로 21', 위도: 37.2703753379, 경도: 127.0212229456 };   // 단지 대표점: 카카오 주소검색 좌표(2026-11-04). 동을 고르지 않았을 때 판정 기준
 const CENTER = { lat: 37.2705, lng: 127.0205, radiusKm: 1.2 };   // 단지 대략 위치(대표 주소 인계동 1173 부근). 이 범위 밖 결과는 확인필요
 const DONGS = Array.from({ length: 30 }, (_, i) => 101 + i);
 const OUT = path.join(ROOT, 'data', 'school');
@@ -89,7 +90,7 @@ async function findDong(n) {
     const check = L.check || d.확인필요 || zMatch === false, why = [...L.reasons, ...(zMatch === false ? [`초등 통학구역: ${ZONE_REASON(ZONE_DATE)}`] : []), ...(d.확인필요 && d.사유 ? [d.사유] : [])];
     return { 동: d.동, 위도: d.위도, 경도: d.경도, 초등학구: pick('elem'), 중학구: pick('mid'), 고교구역: pick('high'), 주소표, 경계거리_m: { 초등: L.levels.elem.near, 중: L.levels.mid.near, 고: L.levels.high.near, 최소: dists.length ? Math.min(...dists) : null }, 상태: check ? '확인필요' : '확정', 확인필요: check, 사유: why };
   });
-  fs.writeFileSync(path.join(OUT, 'complex_district.json'), JSON.stringify({ complex: COMPLEX, 기준: { 학구도: meta.baseDate, 확인필요_경계거리_m: NEAR_M, 주소표: ZONE_DATE }, dongs: rows }, null, 1));
+  fs.writeFileSync(path.join(OUT, 'complex_district.json'), JSON.stringify({ complex: COMPLEX, 기준: { 학구도: meta.baseDate, 확인필요_경계거리_m: NEAR_M, 주소표: ZONE_DATE }, 대표점: REP, dongs: rows }, null, 1));
   const c = rows.filter((r) => r.확인필요).length;
   console.log(`\n동 ${rows.length}개 중 좌표 확보 ${found.length}, 확인필요 ${c}`);
   for (const r of rows) if (r.초등학구) console.log(r.동, r.초등학구.map((x) => x.이름).join('/'), r.중학구.map((x) => x.이름).join('/'), r.고교구역.map((x) => x.이름).join('/'), '최소경계', r.경계거리_m.최소 + 'm', r.상태);
