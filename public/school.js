@@ -27,7 +27,7 @@
   function init() {
     if (!sc.ready) {
       sc.ready = Promise.all([get({ kind: 'schools' })]).then(([j]) => {
-        sc.schools = j.schools; sc.district = j.district; sc.meta = j.meta;
+        sc.near = j.nearM; sc.schools = j.schools; sc.district = j.district; sc.meta = j.meta;
         $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다.`;
       });
       sc.ready.catch(() => { sc.ready = null; });
@@ -179,7 +179,7 @@
     box.append(el('b', '', title), judgeTable(L));
     const s = el('p', L.check ? 'sc-warn' : 'gx-note');
     if (L.check) s.textContent = `확인필요: ${L.reasons.join(' · ')}. ${TEL}에 확인해 주세요.`;
-    else s.textContent = '경계에서 30m 넘게 떨어져 있어 판정은 안정적입니다. 그래도 실제 배정은 관할 교육지원청에서 확인해 주세요.';
+    else s.textContent = `경계에서 ${sc.near}m 넘게 떨어져 있어 판정은 안정적입니다. 그래도 실제 배정은 관할 교육지원청에서 확인해 주세요.`;
     const upd = [...new Set(['elem', 'mid', 'high'].flatMap((k) => L.levels[k].inside.map((d) => `${d.nm} ${d.upd}`)))];
     box.append(s, el('p', 'gx-note', `학구 변경일: ${upd.join(' · ')}`));
   }
@@ -275,7 +275,7 @@
           if (elemSet.length > 1) box.append(el('p', 'sc-warn', `동에 따라 초등 통학구역이 다릅니다 (${elemSet.join(' · ')}). 아래 표에서 해당 동을 확인해 주세요.`));
           box.append(dongTable(complex));
           const n = complex.dongs.filter((d) => d.확인필요).length;
-          box.append(el('p', n ? 'sc-warn' : 'gx-note', n ? `${n}개 동은 경계에 가깝거나 좌표를 확인하지 못해 “확인필요”로 표시했습니다. ${TEL}에 확인해 주세요.` : '모든 동이 경계에서 30m 넘게 떨어져 있습니다.'), el('p', 'gx-note', `학구도 기준일 ${complex.기준.학구도}. 동 위치는 카카오 지도 검색 결과이며 실제 건물 위치와 다를 수 있습니다. 참고용 안내이며 실제 배정은 ${TEL}에서 확인해 주세요.`));
+          box.append(el('p', n ? 'sc-warn' : 'gx-note', n ? `${n}개 동은 경계에 가깝거나 좌표를 확인하지 못해 “확인필요”로 표시했습니다. ${TEL}에 확인해 주세요.` : `모든 동이 경계에서 ${complex.기준.확인필요_경계거리_m}m 넘게 떨어져 있습니다.`), el('p', 'gx-note', `학구도 기준일 ${complex.기준.학구도}. 동 위치는 카카오 지도 검색 결과이며 실제 건물 위치와 다를 수 있습니다. 참고용 안내이며 실제 배정은 ${TEL}에서 확인해 주세요.`));
         } else box.append(el('p', 'sc-warn', `단지 동별 판정 자료를 불러오지 못했습니다 [확인 필요]. ${complex.error || ''}`));
       }
       renderList(rows, from);
