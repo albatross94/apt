@@ -270,9 +270,12 @@
       if (complex) {
         const box = $('sc-dongs');
         if (complex.dongs) {
-          box.append(el('b', '', '동별 초등 통학구역 · 중학군 · 고교구역'), dongTable(complex));
+          const elemSet = [...new Set(complex.dongs.map((d) => (d.초등학구 || []).map((x) => x.이름).join('/')).filter(Boolean))];
+          box.append(el('b', '', '동별 초등 통학구역 · 중학군 · 고교구역'));
+          if (elemSet.length > 1) box.append(el('p', 'sc-warn', `동에 따라 초등 통학구역이 다릅니다 (${elemSet.join(' · ')}). 아래 표에서 해당 동을 확인해 주세요.`));
+          box.append(dongTable(complex));
           const n = complex.dongs.filter((d) => d.확인필요).length;
-          box.append(el('p', n ? 'sc-warn' : 'gx-note', n ? `${n}개 동은 경계에 가깝거나 좌표를 확인하지 못해 “확인필요”로 표시했습니다. ${TEL}에 확인해 주세요.` : '모든 동이 경계에서 30m 넘게 떨어져 있습니다.'), el('p', 'gx-note', `학구도 기준일 ${complex.기준.학구도}. 동 위치는 카카오 지도 검색 결과이며 실제 건물 위치와 다를 수 있습니다.`));
+          box.append(el('p', n ? 'sc-warn' : 'gx-note', n ? `${n}개 동은 경계에 가깝거나 좌표를 확인하지 못해 “확인필요”로 표시했습니다. ${TEL}에 확인해 주세요.` : '모든 동이 경계에서 30m 넘게 떨어져 있습니다.'), el('p', 'gx-note', `학구도 기준일 ${complex.기준.학구도}. 동 위치는 카카오 지도 검색 결과이며 실제 건물 위치와 다를 수 있습니다. 참고용 안내이며 실제 배정은 ${TEL}에서 확인해 주세요.`));
         } else box.append(el('p', 'sc-warn', `단지 동별 판정 자료를 불러오지 못했습니다 [확인 필요]. ${complex.error || ''}`));
       }
       renderList(rows, from);
