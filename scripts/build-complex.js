@@ -88,7 +88,7 @@ async function findDong(n) {
     const zr = zoneByDong(COMPLEX, Number(d.동.replace('동', '')));
     const zMatch = zr ? zoneMatches(zr, L.levels.elem.inside) : null;
     const 주소표 = zr ? { 기준일: ZONE_DATE, 학교: [...new Set(zr.map((r) => r.school))], 임시표기: zr.some((r) => r.temp), 건물명: zr[0].building, 일치: zMatch, 비고: zoneTempNote(zr, L.levels.elem.inside) } : { 기준일: ZONE_DATE, 학교: [], 일치: null };
-    const mp = midPlanFor(pickElemSchool(L),L.levels.mid.inside.map((x) => x.nm));   // 개정안 표 기준 비고만 (상태·판정은 그대로)
+    const mp = midPlanFor(pickElemSchool(L), L.levels.mid.inside.map((x) => x.nm), { complex: COMPLEX, dongNo: Number(d.동.replace('동', '')) });   // 개정안 표 기준 비고만 (상태·판정은 그대로)
     const check = L.check || d.확인필요 || zMatch === false, why = [...L.reasons, ...(zMatch === false ? [`초등 통학구역: ${ZONE_REASON(ZONE_DATE)}`] : []), ...(mp && mp.사유 ? [mp.사유] : []), ...(d.확인필요 && d.사유 ? [d.사유] : [])];
     return { 동: d.동, 위도: d.위도, 경도: d.경도, 초등학구: pick('elem'), 중학구: pick('mid'), 고교구역: pick('high'), 주소표, 중학군_개정안: mp, 경계거리_m: { 초등: L.levels.elem.near, 중: L.levels.mid.near, 고: L.levels.high.near, 최소: dists.length ? Math.min(...dists) : null }, 상태: check ? '확인필요' : '확정', 확인필요: check, 사유: why };
   });

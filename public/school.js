@@ -28,7 +28,7 @@
     if (!sc.ready) {
       sc.ready = Promise.all([get({ kind: 'schools' })]).then(([j]) => {
         sc.near = j.nearM; sc.zoneDate = j.addrZone ? j.addrZone.date : ''; sc.schools = j.schools; sc.byId = new Map(j.schools.map((x) => [x.id, x])); sc.district = j.district; sc.meta = j.meta;
-        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다. ${j.addrZone ? ` 통학구역 주소표 ${j.addrZone.date}, 기준일이 달라 차이가 날 수 있음(수원교육지원청 자료).` : ''}${j.midPlan ? ` 중학군 교차검증: ${j.midPlan.출처}(${j.midPlan.상태}, 기준 학년도 ${j.midPlan.학년도}, 파일 기준일 ${j.midPlan.파일기준일}·게시일 ${j.midPlan.게시일}).` : ''}`;
+        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다. ${j.addrZone ? ` 통학구역 주소표 ${j.addrZone.date}, 기준일이 달라 차이가 날 수 있음(수원교육지원청 자료).` : ''}${j.midPlan ? ` 중학군 교차검증: 중학군 개정(안) ${j.midPlan.학년도}학년도(${j.midPlan.상태}), 출처 ${j.midPlan.출처}(파일 기준일 ${j.midPlan.파일기준일}·게시일 ${j.midPlan.게시일})${j.midPlan.통반출처 ? `, 통·반 근거: ${j.midPlan.통반출처}` : ''}.` : ''}`;
       });
       sc.ready.catch(() => { sc.ready = null; });
     }
