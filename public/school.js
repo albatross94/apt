@@ -67,6 +67,17 @@
   function closePop() { if (sc.pop) { sc.pop.setMap(null); sc.pop = null; } }
   const clear = (arr) => { for (const o of arr.splice(0)) o.setMap(null); };
 
+  /* ----- 지도 전체 화면 (Esc로 돌아오기) ----- */
+  function setFull(on) {
+    const w = $('sc-wrap');
+    if (w.classList.contains('full') === on) return;
+    w.classList.toggle('full', on);
+    $('sc-full').textContent = on ? '전체 화면 닫기 (Esc)' : '전체 화면';
+    if (sc.map) { const c = sc.map.getCenter(); sc.map.relayout(); sc.map.setCenter(c); }   // 크기가 바뀌면 다시 계산하고 보던 중심은 유지
+  }
+  $('sc-full').onclick = () => setFull(!$('sc-wrap').classList.contains('full'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFull(false); });
+
   function popFor(s, role) {
     const d = el('div', 'sc-pop');
     d.append(el('b', '', s.nm), el('div', '', `${s.lv === '고등' ? '고등학교' : s.lv + '학교'} · ${s.est || '설립 정보 없음'}${s.coed ? ' · ' + s.coed : ''}`), el('div', '', s.addr));

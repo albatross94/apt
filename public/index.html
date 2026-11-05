@@ -191,7 +191,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #map-top,#map-search input{font:inherit;color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem}
 #map-top{background:var(--color-bg)}
 #map-search input{background:#fff}
-#map-go,#map-search button,#map-full,#hs-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
+#map-go,#map-search button,#map-full,#hs-full,#sc-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
 #map-go{padding:.45rem 1.2rem}
 #map-go:disabled{opacity:.5;cursor:wait}
 #map-smsg{border-radius:8px}
@@ -259,7 +259,12 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 /* 학교검색 */
 #sc-wrap{display:flex;gap:8px;height:520px}
 #sc-lp{width:340px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
-#sc-box{flex:1;min-width:0;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#sc-area{position:relative;flex:1;min-width:0}
+#sc-box{height:100%;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#sc-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#sc-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg);padding:8px;box-sizing:border-box;height:auto}
+#sc-wrap.full #sc-area{height:auto}
+@media (max-width:720px){#sc-wrap.full{overflow:auto}#sc-wrap.full #sc-area{height:65vh}}
 #sc-ul,#sc-near-ul{list-style:none;margin:0;padding:0}
 #sc-ul li,#sc-near-ul li{padding:.55rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
 #sc-ul li:hover,#sc-ul li.on,#sc-near-ul li:hover,#sc-near-ul li.on{background:var(--color-panel)}
@@ -288,7 +293,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #tab-school .gx-table td,#tab-school .gx-table th{text-align:left}
 .sc-pop{padding:8px 10px;font-size:12px;line-height:1.5;min-width:170px;max-width:240px;color:#202227}
 .sc-pop b{display:block;font-size:13px}
-@media (max-width:720px){#sc-wrap{flex-direction:column;height:auto}#sc-lp{width:auto;max-height:16rem}#sc-box{height:420px;flex:none}}
+@media (max-width:720px){#sc-wrap{flex-direction:column;height:auto}#sc-lp{width:auto;max-height:16rem}#sc-area{height:420px;flex:none}}
 @media print{#tab-hospital,#tab-school,#main-tabs{display:none!important}#tab-trade{gap:.7rem}}
 </style></head>
 <body><div class="wrap">
@@ -448,7 +453,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     </div>
     <div id="sc-wrap">
       <aside id="sc-lp" aria-label="학교 목록"><ul id="sc-ul"></ul><details id="sc-near" hidden><summary>가까운 학교 (직선거리, 참고) — 가까운 학교가 배정 학교는 아닙니다</summary><ul id="sc-near-ul"></ul></details></aside>
-      <div id="sc-box"></div>
+      <div id="sc-area"><div id="sc-box"></div><button type="button" id="sc-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
     </div>
   </section>
   <p class="sc-notice no-print" id="sc-notice">참고용 안내이며 실제 배정은 관할 교육지원청(수원교육지원청 031-250-1482)에서 확인해 주세요. 학구는 변경될 수 있습니다. 가까운 학교가 배정 학교라는 뜻이 아니며, 표시한 거리는 직선거리입니다.</p>
