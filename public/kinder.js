@@ -2,7 +2,7 @@
    자료: 한국교육학술정보원 유치원 공시정보(유치원알리미) → /api/school?kind=kinder (data/kinder/kinder.json), 지도: 카카오맵
    수원시 전체 유치원을 단지 대표점 기준 직선거리 가까운 순으로 보여 주고, 구·설립구분·이름·1km 안 필터를 둔다. */
 (() => {
-  const kd = { map: null, data: null, rows: [], markers: [], clusterer: null, home: null, circle: null, pop: null, loaded: false, loading: false, fit: true };
+  const kd = { map: null, data: null, rows: [], markers: [], clusterer: null, home: null, circle: null, pop: null, sel: null, loaded: false, loading: false, fit: true };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const distTxt = (m) => (m < 1000 ? `약 ${Math.max(10, Math.round(m / 10) * 10).toLocaleString()}m` : `약 ${(m / 1000).toFixed(1)}km`);
   const fmtDate = (s) => String(s || '').replace(/-/g, '.');
@@ -21,13 +21,14 @@
     if (/^https?:\/\/[^\s]+$/i.test(u)) { d.append(document.createTextNode(' ')); const a = el('a', '', '누리집'); a.href = u; a.target = '_blank'; a.rel = 'noopener'; d.append(a); }
     return d;
   }
-  function closePop() { if (kd.pop) { kd.pop.setMap(null); kd.pop = null; } }
+  function closePop() { if (kd.pop) { kd.pop.setMap(null); kd.pop = null; } select(null); }
   function openPop(i) {
     const r = kd.rows[i], m = kd.markers[i];
     if (!m) return;
     closePop();
     const w = el('div'); w.style.cssText = 'background:#fff;border:1px solid #8e1b1c;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.25);margin-bottom:38px';
     w.append(popupFor(r));
+    select(i);
     kd.pop = new kakao.maps.CustomOverlay({ map: kd.map, position: m.getPosition(), content: w, yAnchor: 1, zIndex: 3 });
     // 클러스터 안에 묶여 있으면 풀리도록 확대한 뒤 그 핀으로 이동한다
     if (kd.map.getLevel() > 4) kd.map.setLevel(4);
@@ -39,6 +40,15 @@
   const img = (svg, w, h, ox, oy) => new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(ox, oy) });
   const pins = {};
   const pinImg = (kind) => pins[kind] || (pins[kind] = img(`<svg xmlns="http://www.w3.org/2000/svg" width="29" height="42" viewBox="0 0 29 42"><path d="M14.5 1C7 1 1 7 1 14.5 1 24 14.5 41 14.5 41S28 24 28 14.5C28 7 22 1 14.5 1z" fill="${COLOR[kind][0]}" stroke="${COLOR[kind][1]}" stroke-width="1.5"/><circle cx="14.5" cy="14.5" r="5" fill="#fff"/></svg>`, 29, 42, 14, 42));
+  // 선택된 핀: 유형 색과 관계없이 눈에 띄는 붉은색으로 조금 크게 보여 준다(목록의 선택 항목도 같은 색 계열)
+  let selPin = null;
+  const selImg = () => selPin || (selPin = img('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="52" viewBox="0 0 29 42"><path d="M14.5 1C7 1 1 7 1 14.5 1 24 14.5 41 14.5 41S28 24 28 14.5C28 7 22 1 14.5 1z" fill="#e0245e" stroke="#fff" stroke-width="2"/><circle cx="14.5" cy="14.5" r="5" fill="#fff"/></svg>', 36, 52, 18, 52));
+  function select(i) {
+    const prev = kd.sel;
+    if (prev != null && kd.markers[prev]) { const r = kd.rows[prev]; kd.markers[prev].setImage(pinImg(r.kind)); kd.markers[prev].setZIndex(0); }
+    kd.sel = i;
+    if (i != null && kd.markers[i]) { kd.markers[i].setImage(selImg()); kd.markers[i].setZIndex(10); }
+  }
   const homeImg = () => img('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="2" y="2" width="18" height="18" rx="3" fill="#fff" stroke="#8e1b1c" stroke-width="2.5"/><rect x="7" y="7" width="8" height="8" fill="#8e1b1c"/></svg>', 22, 22, 11, 11);
 
   async function ensureMap() {

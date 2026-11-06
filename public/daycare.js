@@ -2,7 +2,7 @@
    자료: 아이사랑 포털(보건복지부) 어린이집 정보공개 '기본정보조회(정기)' → /api/school?kind=daycare (data/daycare/daycare.json), 지도: 카카오맵
    기본은 단지 대표점 기준 직선거리 1km 안이며, 반경·유형·구·이름 필터를 둔다. 휴지(운영 중단)는 기본으로 숨긴다. */
 (() => {
-  const dc = { map: null, data: null, rows: [], markers: [], clusterer: null, circle: null, pop: null, loaded: false, loading: false };
+  const dc = { map: null, data: null, rows: [], markers: [], clusterer: null, circle: null, pop: null, sel: null, loaded: false, loading: false };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const distTxt = (m) => (m < 1000 ? `약 ${Math.max(10, Math.round(m / 10) * 10).toLocaleString()}m` : `약 ${(m / 1000).toFixed(1)}km`);
   const telHref = (t) => 'tel:' + t.replace(/[^0-9+]/g, '');
@@ -21,13 +21,14 @@
     if (r.t) { const a = el('a', '', '☎ ' + r.t); a.href = telHref(r.t); d.append(a); }
     return d;
   }
-  function closePop() { if (dc.pop) { dc.pop.setMap(null); dc.pop = null; } }
+  function closePop() { if (dc.pop) { dc.pop.setMap(null); dc.pop = null; } select(null); }
   function openPop(i) {
     const r = dc.rows[i], m = dc.markers[i];
     if (!m) return;
     closePop();
     const w = el('div'); w.style.cssText = 'background:#fff;border:1px solid #8e1b1c;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.25);margin-bottom:38px';
     w.append(popupFor(r));
+    select(i);
     dc.pop = new kakao.maps.CustomOverlay({ map: dc.map, position: m.getPosition(), content: w, yAnchor: 1, zIndex: 3 });
     if (dc.map.getLevel() > 4) dc.map.setLevel(4);   // 클러스터가 풀리는 수준까지 확대한 뒤 이동
     dc.map.panTo(m.getPosition());
@@ -38,6 +39,15 @@
   const img = (svg, w, h, ox, oy) => new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(ox, oy) });
   const pins = {};
   const pinImg = (g, faded) => { const k = g + (faded ? '-f' : ''); return pins[k] || (pins[k] = img(`<svg xmlns="http://www.w3.org/2000/svg" width="29" height="42" viewBox="0 0 29 42" opacity="${faded ? 0.5 : 1}"><path d="M14.5 1C7 1 1 7 1 14.5 1 24 14.5 41 14.5 41S28 24 28 14.5C28 7 22 1 14.5 1z" fill="${COLOR[g][0]}" stroke="${COLOR[g][1]}" stroke-width="1.5"/><circle cx="14.5" cy="14.5" r="5" fill="#fff"/></svg>`, 29, 42, 14, 42)); };
+  // 선택된 핀: 유형 색과 관계없이 눈에 띄는 붉은색으로 조금 크게 보여 준다(목록의 선택 항목도 같은 색 계열)
+  let selPin = null;
+  const selImg = () => selPin || (selPin = img('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="52" viewBox="0 0 29 42"><path d="M14.5 1C7 1 1 7 1 14.5 1 24 14.5 41 14.5 41S28 24 28 14.5C28 7 22 1 14.5 1z" fill="#e0245e" stroke="#fff" stroke-width="2"/><circle cx="14.5" cy="14.5" r="5" fill="#fff"/></svg>', 36, 52, 18, 52));
+  function select(i) {
+    const prev = dc.sel;
+    if (prev != null && dc.markers[prev]) { const r = dc.rows[prev]; dc.markers[prev].setImage(pinImg(r.g, rest(r))); dc.markers[prev].setZIndex(0); }
+    dc.sel = i;
+    if (i != null && dc.markers[i]) { dc.markers[i].setImage(selImg()); dc.markers[i].setZIndex(10); }
+  }
   const homeImg = () => img('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><rect x="2" y="2" width="18" height="18" rx="3" fill="#fff" stroke="#8e1b1c" stroke-width="2.5"/><rect x="7" y="7" width="8" height="8" fill="#8e1b1c"/></svg>', 22, 22, 11, 11);
 
   async function ensureMap() {
