@@ -13,7 +13,7 @@
     d.append(el('b', '', r.n));
     d.append(el('div', '', r.est));
     d.append(el('div', '', r.a));
-    d.append(el('div', '', `정원 ${r.cap.toLocaleString()}명 · 원아 ${r.kids.toLocaleString()}명 · 직선거리 ${distTxt(r.d)}`));
+    d.append(el('div', '', `직선거리 ${distTxt(r.d)}`));
     if (r.h) d.append(el('div', '', '운영시간 ' + r.h));
     if (r.t) { const a = el('a', '', '☎ ' + r.t); a.href = telHref(r.t); d.append(a); }
     const u = /^https?:\/\//i.test(r.u) ? r.u : (r.u ? 'http://' + r.u : '');
@@ -66,13 +66,13 @@
       const m = j.meta, km = m.반경_m / 1000;
       $('kd-h').textContent = `${m.기준점.이름} 반경 ${km}km 유치원 — ${j.rows.length}곳`;
       $('kd-note').textContent = `단지 대표점에서 직선거리 ${km}km 안, 가까운 순입니다. 노란 핀은 유치원, 흰 네모는 단지 대표점입니다. 목록에서 항목을 누르면 지도에 표시됩니다.`;
-      $('kd-src').textContent = `출처: ${m.출처}, 수집일 ${fmtDate(m.수집일)}. 정원·원아 수는 공시 자료의 연령별 합계입니다.`;
+      $('kd-src').textContent = `출처: ${m.출처}, 수집일 ${fmtDate(m.수집일)}.`;
       const ul = $('kd-ul'); ul.replaceChildren();
       if (!j.rows.length) ul.append(el('li', '', '반경 안에 공시된 유치원이 없습니다.'));
       j.rows.forEach((r, i) => {
         const li = el('li'); li.dataset.i = i;
         li.append(el('span', 'nm', r.n));
-        li.append(el('small', '', `${r.est} · 직선거리 ${distTxt(r.d)} · 정원 ${r.cap}명 · 원아 ${r.kids}명`));
+        li.append(el('small', '', `${r.est} · 직선거리 ${distTxt(r.d)}`));
         li.append(el('small', '', r.a));
         if (r.t) { const s = el('small'); const a = el('a', '', '☎ ' + r.t); a.href = telHref(r.t); a.onclick = (e) => e.stopPropagation(); s.append(a); li.append(s); }
         li.onclick = () => openPop(i);

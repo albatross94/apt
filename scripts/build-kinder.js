@@ -6,7 +6,7 @@ const root = path.join(__dirname, '..');
 for (const l of fs.readFileSync(path.join(root, '.env'), 'utf8').split(/\r?\n/)) { const m = l.match(/^(\w+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]; }
 const KEY = process.env.KINDER_API_KEY;
 if (!KEY) { console.error('KINDER_API_KEY 가 .env 에 없습니다.'); process.exit(1); }
-const RADIUS_M = 1000, SGG = ['41111', '41113', '41115', '41117'];   // 장안·권선·팔달·영통
+const RADIUS_M = 1000, SGG = ['41110', '41111', '41113', '41115', '41117'];   // 수원시(구 미지정 7곳)·장안·권선·팔달·영통
 const C = require('../data/school/complex_district.json').대표점;
 
 const rad = (d) => d * Math.PI / 180;
@@ -22,8 +22,9 @@ async function page(sgg, n) {
 (async () => {
   const all = [];
   for (const sgg of SGG) for (let n = 1; n < 50; n++) { const it = await page(sgg, n); all.push(...it); if (it.length < 100) break; }
-  const out = []; let noPos = 0, pbnt = new Set();
+  const seen = new Set(), out = []; let noPos = 0, pbnt = new Set();
   for (const x of all) {
+    if (seen.has(x.kindercode)) continue; seen.add(x.kindercode);
     pbnt.add(x.pbnttmng);
     const lat = Number(x.lttdcdnt), lng = Number(x.lngtcdnt);
     if (!lat || !lng) { noPos++; continue; }
@@ -37,7 +38,7 @@ async function page(sgg, n) {
     });
   }
   out.sort((a, b) => a.d - b.d);
-  const meta = { 출처: '한국교육학술정보원 유치원 공시정보(유치원알리미)', 수집일: new Date().toISOString().slice(0, 10), 공시차수: [...pbnt].join(','), 기준점: { 이름: '수원센트럴아이파크자이', 위도: C.위도, 경도: C.경도 }, 반경_m: RADIUS_M, 전체_건수: all.length, 좌표없음: noPos };
+  const meta = { 출처: '한국교육학술정보원 유치원 공시정보(유치원알리미)', 수집일: new Date().toISOString().slice(0, 10), 공시차수: [...pbnt].join(','), 기준점: { 이름: '수원센트럴아이파크자이', 위도: C.위도, 경도: C.경도 }, 반경_m: RADIUS_M, 전체_건수: seen.size, 좌표없음: noPos };
   fs.writeFileSync(path.join(root, 'data/kinder/kinder.json'), JSON.stringify({ meta, rows: out }, null, 1));
   console.log('수신', all.length, '건 / 좌표 없음', noPos, '/ 반경 안', out.length, '건 / 공시차수', meta.공시차수);
 })().catch((e) => { console.error(e.message.replace(KEY, '<KEY>')); process.exit(1); });
