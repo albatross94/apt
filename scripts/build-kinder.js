@@ -1,6 +1,6 @@
 // 유치원알리미(한국교육학술정보원) 공시정보 → data/kinder/kinder.json
 // 사용: node scripts/build-kinder.js   (.env 의 KINDER_API_KEY 필요. 키는 이 스크립트 실행 때만 쓰며 결과 JSON에는 넣지 않는다)
-// 수원시 4개 구를 받아 단지 대표점(data/school/complex_district.json) 반경 안의 유치원만 저장한다.
+// 수원시 전체 유치원을 받아 단지 대표점(data/school/complex_district.json)까지의 직선거리와 함께 저장한다.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 for (const l of fs.readFileSync(path.join(root, '.env'), 'utf8').split(/\r?\n/)) { const m = l.match(/^(\w+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]; }
@@ -29,16 +29,15 @@ async function page(sgg, n) {
     const lat = Number(x.lttdcdnt), lng = Number(x.lngtcdnt);
     if (!lat || !lng) { noPos++; continue; }
     const d = dist(C.위도, C.경도, lat, lng);
-    if (d > RADIUS_M) continue;
+    const gu = (String(x.addr).match(/수원시 *(장안구|권선구|팔달구|영통구)/) || [])[1] || '';   // 구 코드가 없는 곳은 주소로 구를 정한다
     out.push({
       n: x.kindername, est: x.establish, a: x.addr, t: x.telno || '', u: x.hpaddr || '', h: x.opertime || '',
-      cap: num(x.ag3fpcnt) + num(x.ag4fpcnt) + num(x.ag5fpcnt) + num(x.mixfpcnt) + num(x.spcnfpcnt),
-      kids: num(x.ppcnt3) + num(x.ppcnt4) + num(x.ppcnt5) + num(x.mixppcnt) + num(x.shppcnt),
+      gu, kind: /사립/.test(x.establish) ? '사립' : '공립',
       lat, lng, d: Math.round(d),
     });
   }
   out.sort((a, b) => a.d - b.d);
   const meta = { 출처: '한국교육학술정보원 유치원 공시정보(유치원알리미)', 수집일: new Date().toISOString().slice(0, 10), 공시차수: [...pbnt].join(','), 기준점: { 이름: '수원센트럴아이파크자이', 위도: C.위도, 경도: C.경도 }, 반경_m: RADIUS_M, 전체_건수: seen.size, 좌표없음: noPos };
   fs.writeFileSync(path.join(root, 'data/kinder/kinder.json'), JSON.stringify({ meta, rows: out }, null, 1));
-  console.log('수신', all.length, '건 / 좌표 없음', noPos, '/ 반경 안', out.length, '건 / 공시차수', meta.공시차수);
+  console.log('수신', all.length, '건 / 좌표 없음', noPos, '/ 저장', out.length, '건 / 공시차수', meta.공시차수);
 })().catch((e) => { console.error(e.message.replace(KEY, '<KEY>')); process.exit(1); });
