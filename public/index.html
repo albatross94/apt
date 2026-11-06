@@ -286,6 +286,8 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .sc-layers{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center}
 .sc-layers label{display:inline-flex;gap:.35rem;align-items:center;cursor:pointer}
 .sc-sw{display:inline-block;width:.9rem;height:.9rem;border-radius:3px}
+.sc-sw-group{display:inline-flex;gap:2px}
+.sc-sw-group .sc-sw{width:.6rem;height:.6rem}
 .sc-warn{background:#fff3dc;border:1px solid #f0d49a;color:#7a4b00;border-radius:8px;padding:.5rem .7rem;font-size:var(--cds-font-size-caption);line-height:1.55}
 .sc-ok{color:#1f6b3b;font-weight:var(--cds-font-weight-medium)}
 .sc-chk{color:#a05a00;font-weight:var(--cds-font-weight-medium)}
@@ -449,6 +451,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <div class="sc-layers" id="sc-layers" role="group" aria-label="학구 경계 표시">
       <label><input type="checkbox" data-l="elem"><i class="sc-sw" style="background:#2b6cb0"></i>초등 통학구역</label>
       <label><input type="checkbox" data-l="mid"><i class="sc-sw" style="background:#2e9d5b"></i>중학군</label>
+      <label title="수원교육지원청 2027학년도 중학교 신입생 배정업무 시행계획(2026.10) 기준 참고용 구역. 법적 확정 경계가 아닙니다."><input type="checkbox" data-l="namb"><span class="sc-sw-group"><i class="sc-sw" style="background:#2b6cb0"></i><i class="sc-sw" style="background:#2e9d5b"></i><i class="sc-sw" style="background:#e67e22"></i><i class="sc-sw" style="background:#c0392b"></i></span>남부중학군 1·2·3구역(참고용)</label>
       <label><input type="checkbox" data-l="high"><i class="sc-sw" style="background:#c0392b"></i>고교구역</label>
     </div>
     <div id="sc-wrap">

@@ -109,6 +109,70 @@
     const g = await geo(l);
     sc.polys[l] = g.features.flatMap((f) => polysOf(f, { strokeWeight: 2, strokeColor: COLOR[l], strokeOpacity: .85, fillColor: COLOR[l], fillOpacity: .08 }));
   }
+
+  /* ----- 남부중학군 1·2·3구역 레이어 (참고용, 2027학년도 시행계획 기준 — 법적 확정 아님) ----- */
+  const NAMB_TEL = '참고용 · 2027학년도 시행계획 기준 · 확정은 수원교육지원청(031-250-1469)';
+  const NAMB_COLOR = { '남부중학군 1구역': '#2b6cb0', '남부중학군 2구역': '#2e9d5b', '남부중학군 3구역': '#e67e22', '매교초2(동부중학군)': '#c0392b' };
+  const NAMB_INFO = {
+    '남부중학군 1구역': {
+      elem: ['권선초', '남수원초', '매교초1', '세류초', '수원신곡초'], mid: ['권선중', '세류중', '수원중'],
+      note: '매교초1은 매교초에서 매교초2를 뺀 구역. 남수원초 권선2동 29·30통(공군관사)은 이번 도형에 미반영 — 문구로만 안내.',
+    },
+    '남부중학군 2구역': {
+      elem: ['곡반초', '곡선초', '곡정초', '규장초', '명당초', '선행초', '세곡초', '수원선일초', '안룡초', '효정초'], mid: ['곡반중', '곡선중', '규장중', '남수원중', '화홍중'],
+      note: '곡반초 신동택지지구(남부·영통 공동학구)는 이번 도형에 미반영 — 문구로만 안내.',
+    },
+    '남부중학군 3구역': {
+      elem: ['매탄초2', '매현초', '효동초', '효원초'], mid: ['매탄중', '매현중'],
+      note: '매탄초2는 매탄초 ∩ 남부중학군 도형으로 만든 근사 구역(정확한 통·반 경계 아님). 나머지 매탄초는 동부중학군.',
+    },
+    '매교초2(동부중학군)': {
+      elem: ['매교초(인계동 53통 1~2반, 54통 1~3반 — 매교초2)'], mid: [], midNote: '동부중학군 적용 (남부중학군 배정 대상 아님)',
+      note: '매교초2는 매교초 ∩ 동부중학군 도형으로 만든 근사 구역(정확한 통·반 경계 아님).',
+    },
+  };
+  // namb_zones.geojson 은 Polygon·MultiPolygon·GeometryCollection(폴리곤+보조 선)이 섞여 있다. LineString은 표시하지 않고 폴리곤만 꺼낸다.
+  function nambPolys(geom) {
+    if (geom.type === 'Polygon') return [geom.coordinates];
+    if (geom.type === 'MultiPolygon') return geom.coordinates;
+    if (geom.type === 'GeometryCollection') return geom.geometries.flatMap((g) => (g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : []));
+    return [];
+  }
+  async function nambGeo() {
+    if (!sc.nambGeo) sc.nambGeo = get({ kind: 'zones' });
+    try { return await sc.nambGeo; } catch (e) { sc.nambGeo = null; throw e; }
+  }
+  function openNambPop(f, pos) {
+    closePop();
+    const nm = f.properties.구역, info = NAMB_INFO[nm] || {};
+    const w = el('div'); w.style.cssText = `background:#fff;border:1px solid ${NAMB_COLOR[nm] || '#8e1b1c'};border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.25);margin-bottom:22px`;
+    const d = el('div', 'sc-pop'); d.style.maxWidth = '260px';
+    d.append(el('b', '', nm));
+    d.append(el('div', '', `소속 초등학교: ${info.elem.join(', ')}`));
+    d.append(el('div', '', info.mid.length ? `A안 중학교: ${info.mid.join(', ')}` : info.midNote || ''));
+    if (info.note) d.append(el('small', '', info.note));
+    d.append(el('small', '', NAMB_TEL));
+    w.append(d);
+    sc.pop = new kakao.maps.CustomOverlay({ map: sc.map, position: pos, content: w, yAnchor: 1, zIndex: 20 });
+  }
+  async function toggleNamb(on) {
+    if (sc.namb) { clear(sc.namb); delete sc.namb; sc.namb = null; }
+    if (!on) return;
+    await ensureMap();
+    const g = await nambGeo();
+    sc.namb = [];
+    for (const f of g.features) {
+      const color = NAMB_COLOR[f.properties.구역] || '#555';
+      for (const poly of nambPolys(f.geometry)) {
+        const p = new kakao.maps.Polygon({
+          map: sc.map, path: poly.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))),
+          strokeWeight: 2, strokeColor: color, strokeOpacity: .85, fillColor: color, fillOpacity: .15,
+        });
+        kakao.maps.event.addListener(p, 'click', (e) => openNambPop(f, e.latLng));
+        sc.namb.push(p);
+      }
+    }
+  }
   async function highlight(ids) {   // [{l, id}] 학구를 굵게 표시하고 그 범위로 지도를 맞춘다
     clear(sc.hl);
     const bounds = new kakao.maps.LatLngBounds();
@@ -477,7 +541,10 @@
   $('sc-near').addEventListener('toggle', () => { if (sc.view) redraw(sc.view, false, null).catch(() => {}); });
 
   for (const cb of document.querySelectorAll('#sc-layers input')) {
-    cb.onchange = async () => { try { await toggleLayer(cb.dataset.l, cb.checked); } catch (e) { cb.checked = false; $('sc-status').textContent = '학구 경계를 불러오지 못했습니다: ' + e.message; } };
+    cb.onchange = async () => {
+      try { await (cb.dataset.l === 'namb' ? toggleNamb(cb.checked) : toggleLayer(cb.dataset.l, cb.checked)); }
+      catch (e) { cb.checked = false; $('sc-status').textContent = '학구 경계를 불러오지 못했습니다: ' + e.message; }
+    };
   }
   $('sc-go').onclick = search;
   $('sc-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
