@@ -191,7 +191,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #map-top,#map-search input{font:inherit;color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem}
 #map-top{background:var(--color-bg)}
 #map-search input{background:#fff}
-#map-go,#map-search button,#map-full,#hs-full,#sc-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
+#map-go,#map-search button,#map-full,#hs-full,#sc-full,#kd-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
 #map-go{padding:.45rem 1.2rem}
 #map-go:disabled{opacity:.5;cursor:wait}
 #map-smsg{border-radius:8px}
@@ -246,6 +246,21 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #hs-ul .nm{font-weight:var(--cds-font-weight-medium)}
 #hs-ul small{display:block;color:var(--color-fg-muted);font-size:11px}
 #hs-ul li.nol{color:var(--color-fg-muted);cursor:default}
+#kd-wrap{display:flex;gap:8px;height:520px}
+#kd-area{position:relative;flex:1;min-width:0}
+#kd-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#kd-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg);padding:8px;box-sizing:border-box;height:auto}
+#kd-wrap.full #kd-area{height:auto}
+@media (max-width:720px){#kd-wrap.full{overflow:auto}#kd-wrap.full #kd-area{height:65vh}}
+#kd-box{height:100%;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#kd-lp{width:300px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
+#kd-ul{list-style:none;margin:0;padding:0}
+#kd-ul li{padding:.5rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
+#kd-ul li:hover,#kd-ul li.on{background:var(--color-panel)}
+#kd-ul .nm{font-weight:var(--cds-font-weight-medium)}
+#kd-ul small{display:block;color:var(--color-fg-muted);font-size:11px}
+#kd-ul a{color:inherit}
+@media (max-width:720px){#kd-wrap{flex-direction:column;height:auto}#kd-area{height:420px;flex:none}#kd-lp{width:auto;max-height:14rem}}
 .hs-pop{padding:8px 10px;font-size:12px;line-height:1.5;min-width:180px;max-width:260px;color:#202227}
 .hs-pop b{display:block;font-size:13px}
 .hs-hrs{margin-top:6px;padding-top:6px;border-top:1px solid #dcd7cf}
@@ -316,6 +331,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <button type="button" role="tab" id="mt-trade" data-t="trade" aria-selected="true">실거래가 조회</button>
     <button type="button" role="tab" id="mt-hospital" data-t="hospital" aria-selected="false">병원·약국검색</button>
     <button type="button" role="tab" id="mt-school" data-t="school" aria-selected="false">학교검색</button>
+    <button type="button" role="tab" id="mt-kinder" data-t="kinder" aria-selected="false">유치원</button>
   </nav>
 <div id="tab-trade" role="tabpanel" aria-labelledby="mt-trade">
 
@@ -431,6 +447,18 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
       <aside id="hs-lp" aria-label="병원 목록"><ul id="hs-ul"></ul></aside>
       <div id="hs-area"><div id="hs-box"></div><button type="button" id="hs-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
     </div>
+  </section>
+</div>
+<div id="tab-kinder" role="tabpanel" aria-labelledby="mt-kinder" hidden>
+  <section class="gx-card no-print" id="kd-card" aria-label="유치원 안내">
+    <h2 id="kd-h">수원센트럴아이파크자이 반경 1km 유치원</h2>
+    <p class="gx-note" id="kd-note">불러오는 중…</p>
+    <div id="kd-wrap">
+      <aside id="kd-lp" aria-label="유치원 목록"><ul id="kd-ul"></ul></aside>
+      <div id="kd-area"><div id="kd-box"></div><button type="button" id="kd-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
+    </div>
+    <p class="gx-note" id="kd-src"></p>
+    <p class="gx-note">공시 자료를 지도에 모은 안내이며 특정 시설을 추천하거나 평가하지 않습니다. 거리는 단지 대표점에서 잰 직선거리라 실제 도보 거리와 다를 수 있습니다. 입소·모집 여부와 일정은 해당 기관에 확인하세요.</p>
   </section>
 </div>
 <div id="tab-school" role="tabpanel" aria-labelledby="mt-school" hidden>
@@ -1978,4 +2006,5 @@ function infoRender() {
 
 </script>
 <script src="/hospital.js"></script>
-<script src="/school.js"></script></body></html>
+<script src="/school.js"></script>
+<script src="/kinder.js"></script></body></html>
