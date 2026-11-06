@@ -191,7 +191,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #map-top,#map-search input{font:inherit;color:var(--color-fg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem}
 #map-top{background:var(--color-bg)}
 #map-search input{background:#fff}
-#map-go,#map-search button,#map-full,#hs-full,#sc-full,#kd-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
+#map-go,#map-search button,#map-full,#hs-full,#sc-full,#kd-full,#dc-full{font:inherit;font-weight:var(--cds-font-weight-medium);border:1px solid #8e1b1c;border-radius:8px;background:#8e1b1c;color:#fff;cursor:pointer}
 #map-go{padding:.45rem 1.2rem}
 #map-go:disabled{opacity:.5;cursor:wait}
 #map-smsg{border-radius:8px}
@@ -262,6 +262,23 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 #kd-ul small{display:block;color:var(--color-fg-muted);font-size:11px}
 #kd-ul a{color:inherit}
 @media (max-width:720px){#kd-wrap{flex-direction:column;height:auto}#kd-area{height:420px;flex:none}#kd-lp{width:auto;max-height:14rem}}
+#dc-wrap{display:flex;gap:8px;height:520px}
+#dc-area{position:relative;flex:1;min-width:0}
+#dc-full{position:absolute;top:10px;right:10px;z-index:10;padding:.35rem .7rem;font-size:var(--cds-font-size-caption);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+#dc-wrap.full{position:fixed;inset:0;z-index:9999;background:var(--color-bg);padding:8px;box-sizing:border-box;height:auto}
+#dc-wrap.full #dc-area{height:auto}
+@media (max-width:720px){#dc-wrap.full{overflow:auto}#dc-wrap.full #dc-area{height:65vh}}
+#dc-box{height:100%;border-radius:10px;overflow:hidden;border:1px solid var(--color-border-line)}
+#dc-lp{width:300px;flex:none;overflow:auto;border:1px solid var(--color-border-line);border-radius:10px}
+#dc-ul{list-style:none;margin:0;padding:0}
+#dc-ul li{padding:.5rem .7rem;border-bottom:1px solid var(--color-border-line);cursor:pointer}
+#dc-ul li:hover,#dc-ul li.on{background:var(--color-panel)}
+#dc-ul .nm{font-weight:var(--cds-font-weight-medium)}
+#dc-ul small{display:block;color:var(--color-fg-muted);font-size:11px}
+#dc-ul a{color:inherit}
+@media (max-width:720px){#dc-wrap{flex-direction:column;height:auto}#dc-area{height:420px;flex:none}#dc-lp{width:auto;max-height:14rem}}
+.gx-ctrl .dc-chk{flex-direction:row;align-items:center;gap:.4rem}#dc-legend{display:flex;gap:1rem;flex-wrap:wrap;align-items:center}
+.dc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;border:1px solid #fff;outline:1px solid #888}.dc-g-국공립{background:#2f6fd6}.dc-g-민간{background:#e8a317}.dc-g-가정{background:#2e9d5b}.dc-g-직장{background:#8e44ad}.dc-g-협동{background:#d9534f}.dc-g-기타{background:#8a8f98}.dc-home{border-radius:2px;background:#8e1b1c;border:2px solid #fff;outline:1px solid #8e1b1c}
 .hs-pop{padding:8px 10px;font-size:12px;line-height:1.5;min-width:180px;max-width:260px;color:#202227}
 .hs-pop b{display:block;font-size:13px}
 .hs-hrs{margin-top:6px;padding-top:6px;border-top:1px solid #dcd7cf}
@@ -333,6 +350,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     <button type="button" role="tab" id="mt-hospital" data-t="hospital" aria-selected="false">병원·약국검색</button>
     <button type="button" role="tab" id="mt-school" data-t="school" aria-selected="false">학교검색</button>
     <button type="button" role="tab" id="mt-kinder" data-t="kinder" aria-selected="false">유치원</button>
+    <button type="button" role="tab" id="mt-daycare" data-t="daycare" aria-selected="false">어린이집</button>
   </nav>
 <div id="tab-trade" role="tabpanel" aria-labelledby="mt-trade">
 
@@ -469,6 +487,28 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
     </div>
     <p class="gx-note" id="kd-src"></p>
     <p class="gx-note">공시 자료 기준이며 누락될 수 있습니다. 공시 자료를 지도에 모은 안내이며 특정 시설을 추천하거나 평가하지 않습니다. 거리는 단지 대표점에서 잰 직선거리라 실제 도보 거리와 다를 수 있습니다. 입소·모집 여부와 일정은 해당 기관에 확인하세요.</p>
+  </section>
+</div>
+<div id="tab-daycare" role="tabpanel" aria-labelledby="mt-daycare" hidden>
+  <section class="gx-card gx-ctrl no-print" aria-label="어린이집 검색 조건">
+    <div class="gx-row">
+      <label>반경<select id="dc-r"><option value="500">단지 500m</option><option value="1000" selected>단지 1km</option><option value="2000">단지 2km</option><option value="0">수원시 전체</option></select></label>
+      <label>유형<select id="dc-ty"><option value="">전체</option><option value="국공립">국공립</option><option value="민간">민간</option><option value="가정">가정</option><option value="직장">직장</option><option value="협동">협동</option><option value="기타">기타(사회복지법인·법인·단체등)</option></select></label>
+      <label>구<select id="dc-gu"><option value="">수원시 전체</option><option value="팔달구">팔달구</option><option value="장안구">장안구</option><option value="권선구">권선구</option><option value="영통구">영통구</option></select></label>
+      <label>어린이집명<input id="dc-name" type="search" maxlength="40" placeholder="일부만 입력해도 됩니다" autocomplete="off"></label>
+      <label class="dc-chk"><input id="dc-rest" type="checkbox"> 휴지(운영 중단) 어린이집도 보기</label>
+    </div>
+  </section>
+  <section class="gx-card no-print" id="dc-card" aria-label="어린이집 안내">
+    <h2 id="dc-h">수원시 어린이집</h2>
+    <p class="gx-note" id="dc-note">불러오는 중…</p>
+    <div id="dc-legend" class="gx-note" aria-label="범례"></div>
+    <div id="dc-wrap">
+      <aside id="dc-lp" aria-label="어린이집 목록"><ul id="dc-ul"></ul></aside>
+      <div id="dc-area"><div id="dc-box"></div><button type="button" id="dc-full" class="sec" title="지도를 화면 가득 크게 봅니다 (Esc로 돌아오기)">전체 화면</button></div>
+    </div>
+    <p class="gx-note" id="dc-src"></p>
+    <p class="gx-note">공시 자료를 지도에 모은 안내이며 특정 어린이집을 추천하거나 평가하지 않습니다. 폐원·이전·변경 등으로 실제와 다를 수 있습니다. 거리는 단지 대표점에서 잰 직선거리라 실제 도보 거리와 다를 수 있습니다. 정원·현원은 포털 공개 항목 그대로이며, 입소 가능 여부와 대기 현황은 아이사랑 포털 또는 해당 어린이집에 확인하세요.</p>
   </section>
 </div>
 <div id="tab-school" role="tabpanel" aria-labelledby="mt-school" hidden>
@@ -2017,4 +2057,5 @@ function infoRender() {
 </script>
 <script src="/hospital.js"></script>
 <script src="/school.js"></script>
-<script src="/kinder.js"></script></body></html>
+<script src="/kinder.js"></script>
+<script src="/daycare.js"></script></body></html>

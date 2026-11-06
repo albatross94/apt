@@ -6,6 +6,6 @@
   "outputDirectory": "public",
   "regions": ["icn1"],
   "functions": {
-    "api/**/*.js": { "maxDuration": 60, "includeFiles": "data/{school,kinder}/**" }
+    "api/**/*.js": { "maxDuration": 60, "includeFiles": "data/{school,kinder,daycare}/**" }
   }
 }
