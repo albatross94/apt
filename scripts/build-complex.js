@@ -82,7 +82,7 @@ async function findDong(n) {
   const meta = JSON.parse(fs.readFileSync(path.join(OUT, 'sw_schools.json'), 'utf8')).meta;
   const rows = dongs.map((d) => {
     if (d.위도 == null) return { 동: d.동, 위도: null, 경도: null, 상태: '확인필요', 확인필요: true, 사유: [d.사유] };
-    const L = locate(d.위도, d.경도), pick = (k) => L.levels[k].inside.map((x) => ({ id: x.id, 이름: x.nm, 공동학구: x.joint, 변경일: x.upd, 기준일: x.base, 학교: x.schools.map((s) => s.nm) }));
+    const L = locate(d.위도, d.경도), pick = (k) => L.levels[k].inside.map((x) => ({ id: x.id, 이름: x.nmDisplay || x.nm, 공동학구: x.joint, 변경일: x.upd, 기준일: x.base, 학교: x.schools.map((s) => s.nm) }));
     const dists = ['elem', 'mid', 'high'].map((k) => L.levels[k].near).filter((v) => v != null);
     // 수원교육지원청 통학구역 주소표(초등)와 비교. 다르면 확인필요로만 올리고 좌표 판정은 바꾸지 않는다.
     const zr = zoneByDong(COMPLEX, Number(d.동.replace('동', '')));

@@ -28,7 +28,7 @@
     if (!sc.ready) {
       sc.ready = Promise.all([get({ kind: 'schools' })]).then(([j]) => {
         sc.near = j.nearM; sc.zoneDate = j.addrZone ? j.addrZone.date : ''; sc.schools = j.schools; sc.byId = new Map(j.schools.map((x) => [x.id, x])); sc.district = j.district; sc.meta = j.meta;
-        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다. ${j.addrZone ? ` 통학구역 주소표 ${j.addrZone.date}, 기준일이 달라 차이가 날 수 있음(수원교육지원청 자료).` : ''}${j.midPlan ? ` 중학군 교차검증: 중학군 개정(안) ${j.midPlan.학년도}학년도(${j.midPlan.상태}), 출처 ${j.midPlan.출처}(파일 기준일 ${j.midPlan.파일기준일}·게시일 ${j.midPlan.게시일})${j.midPlan.통반출처 ? `, 통·반 근거: ${j.midPlan.통반출처}` : ''}.` : ''}`;
+        $('sc-dates').textContent = `자료 기준일: 학구도 ${j.meta.baseDate}(학구 변경일은 학구마다 표시) · 학교 위치 ${j.meta.locationDate} · 학교 기본정보 ${j.meta.infoDate}. 출처: 한국교육시설안전원, 교육부 학교기본정보. 학구도는 매년 3월·9월에 갱신됩니다. ${j.addrZone ? ` 통학구역 주소표 ${j.addrZone.date}, 기준일이 달라 차이가 날 수 있음(수원교육지원청 자료).` : ''}${j.midPlan ? ` 중학군 교차검증: 중학군 개정(안) ${j.midPlan.학년도}학년도(${j.midPlan.상태}), 출처 ${j.midPlan.출처}(파일 기준일 ${j.midPlan.파일기준일}·게시일 ${j.midPlan.게시일})${j.midPlan.통반출처 ? `, 통·반 근거: ${j.midPlan.통반출처}` : ''}.` : ''}${j.nambZone ? ` 남부중학군 1·2·3구역 표시 출처: ${j.nambZone.출처}. ${j.nambZone.문구}.` : ''}`;
       });
       sc.ready.catch(() => { sc.ready = null; });
     }
@@ -116,14 +116,17 @@
   const NAMB_INFO = {
     '남부중학군 1구역': {
       elem: ['권선초', '남수원초', '매교초1', '세류초', '수원신곡초'], mid: ['권선중', '세류중', '수원중'],
+      band: 'A안: 이 3곳 중 3지망까지 지원 · B안: 1지망은 2·3구역 중학교, 2지망부터는 1구역 중학교(4지망까지) — 구역별 A·B안 중 선택 지원',
       note: '매교초1은 매교초에서 매교초2를 뺀 구역. 남수원초 권선2동 29·30통(공군관사)은 이번 도형에 미반영 — 문구로만 안내.',
     },
     '남부중학군 2구역': {
       elem: ['곡반초', '곡선초', '곡정초', '규장초', '명당초', '선행초', '세곡초', '수원선일초', '안룡초', '효정초'], mid: ['곡반중', '곡선중', '규장중', '남수원중', '화홍중'],
+      band: '구역별 A·B안 중 선택 지원(B안은 1지망만 다른 구역 중학교)',
       note: '곡반초 신동택지지구(남부·영통 공동학구)는 이번 도형에 미반영 — 문구로만 안내.',
     },
     '남부중학군 3구역': {
       elem: ['매탄초2', '매현초', '효동초', '효원초'], mid: ['매탄중', '매현중'],
+      band: '구역별 A·B안 중 선택 지원(B안은 1지망만 다른 구역 중학교)',
       note: '매탄초2는 매탄초 ∩ 남부중학군 도형으로 만든 근사 구역(정확한 통·반 경계 아님). 나머지 매탄초는 동부중학군.',
     },
     '매교초2(동부중학군)': {
@@ -150,6 +153,7 @@
     d.append(el('b', '', nm));
     d.append(el('div', '', `소속 초등학교: ${info.elem.join(', ')}`));
     d.append(el('div', '', info.mid.length ? `A안 중학교: ${info.mid.join(', ')}` : info.midNote || ''));
+    if (info.band) d.append(el('small', '', info.band));
     if (info.note) d.append(el('small', '', info.note));
     d.append(el('small', '', NAMB_TEL));
     w.append(d);
@@ -289,14 +293,14 @@
     const hd = (text, sub, cls) => { const li = el('li', 'sc-hd ' + (cls || '')); li.append(document.createTextNode(text)); if (sub) li.append(el('small', '', sub)); return li; };
     ul.append(hd(V.basis, V.basisSub, 'top'));
     for (const m of V.members) {
-      ul.append(hd(`${LVNAME[m.k]} · ${m.d.nm}${m.d.joint ? ' (공동학구)' : ''}`, `소속 학교 ${m.schools.length}곳 · 이름순`));
+      ul.append(hd(`${LVNAME[m.k]} · ${m.d.nmDisplay || m.d.nm}${m.d.joint ? ' (공동학구)' : ''}`, `소속 학교 ${m.schools.length}곳 · 이름순`));
       for (const s of m.schools) ul.append(liFor(s, { role: 'm', from: V.from }));
     }
     if (!V.members.length) ul.append(el('li', 'nol', '판정된 학구를 찾지 못했습니다 [확인 필요]'));
     if (V.cands.length) {
       ul.append(hd('경계 맞은편 후보 (참고)', `판정된 학구 소속이 아니며 배정 학교로 단정할 수 없습니다. ${TEL}에 확인해 주세요.`, 'top cand'));
       for (const m of V.cands) {
-        ul.append(hd(`${LVNAME[m.k]} · ${m.d.nm}`, `${m.d.why === 'zone' ? `주소표(${sc.zoneDate}) 학교가 속한 구역` : `경계까지 약 ${Math.round(m.d.dist)}m`} · 소속 학교 ${m.schools.length}곳`, 'cand'));
+        ul.append(hd(`${LVNAME[m.k]} · ${m.d.nmDisplay || m.d.nm}`, `${m.d.why === 'zone' ? `주소표(${sc.zoneDate}) 학교가 속한 구역` : `경계까지 약 ${Math.round(m.d.dist)}m`} · 소속 학교 ${m.schools.length}곳`, 'cand'));
         for (const s of m.schools) ul.append(liFor(s, { role: 'c', from: V.from }));
       }
     }
@@ -371,7 +375,7 @@
     for (const k of ['elem', 'mid', 'high']) {
       const X = L.levels[k], tr = el('tr');
       tr.append(el('td', 'l', LVNAME[k]));
-      tr.append(el('td', 'l', X.inside.map((d) => d.nm + (d.joint ? '(공동학구)' : '')).join(', ') || '[확인 필요]'));
+      tr.append(el('td', 'l', X.inside.map((d) => (d.nmDisplay || d.nm) + (d.joint ? '(공동학구)' : '')).join(', ') || '[확인 필요]'));
       const names = [...new Set(X.inside.flatMap((d) => d.schools.map((s) => s.nm)))];
       tr.append(el('td', 'l', names.length > 10 ? `${names.length}개교: ${names.join(', ')}` : names.join(', ') || '-'));
       tr.append(el('td', 'l', X.near == null ? '-' : `약 ${Math.round(X.near)}m`));
