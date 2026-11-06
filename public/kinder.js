@@ -1,5 +1,5 @@
 /* ---------- 유치원 탭 ----------
-   자료: 한국교육학술정보원 유치원 공시정보(유치원알리미) → /api/kinder (data/kinder/kinder.json), 지도: 카카오맵
+   자료: 한국교육학술정보원 유치원 공시정보(유치원알리미) → /api/school?kind=kinder (data/kinder/kinder.json), 지도: 카카오맵
    수원시 전체 유치원을 단지 대표점 기준 직선거리 가까운 순으로 보여 주고, 구·설립구분·이름·1km 안 필터를 둔다. */
 (() => {
   const kd = { map: null, data: null, rows: [], markers: [], clusterer: null, home: null, circle: null, pop: null, loaded: false, loading: false, fit: true };
@@ -97,7 +97,7 @@
     if (kd.loaded || kd.loading) return;
     kd.loading = true;
     try {
-      const res = await fetch('/api/kinder'), j = await res.json();
+      const res = await fetch('/api/school?kind=kinder'), j = await res.json();
       if (!res.ok) throw new Error(j.error || '유치원 정보를 불러오지 못했습니다.');
       kd.data = j; kd.loaded = true;
       $('kd-src').textContent = `출처: ${j.meta.출처}, 수집일 ${fmtDate(j.meta.수집일)}.`;

@@ -18,7 +18,7 @@ try {
 const core = require('./lib/core');
 const auth = require('./lib/auth');
 
-const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/landuse': 'landuse', '/api/aptinfo': 'aptinfo', '/api/aptdetail': 'aptdetail', '/api/aptfee': 'aptfee', '/api/hospital': 'hospital', '/api/school': 'school', '/api/kinder': 'kinder', '/api/config': 'config' };
+const API_ROUTES = { '/api/trades': 'trades', '/api/gongsi/years': 'gongsi/years', '/api/gongsi/units': 'gongsi/units', '/api/geocode': 'geocode', '/api/landuse': 'landuse', '/api/aptinfo': 'aptinfo', '/api/aptdetail': 'aptdetail', '/api/aptfee': 'aptfee', '/api/hospital': 'hospital', '/api/school': 'school', '/api/config': 'config' };
 const AUTH_KINDS = ['login', 'logout', 'me'];   // /api/auth?kind=… (Vercel에서는 api/auth.js 한 함수)
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
