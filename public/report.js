@@ -174,11 +174,12 @@ function chgRow(D,c0,cols){
   for(i=c0;i<cols;i++){var c=byM[i];
     if(!c){cells+='<span>—</span>';continue}
     any=true;
-    var up=c.pc>0,dn=c.pc<0,txt=(up?'▲ ':dn?'▼ ':'')+Math.abs(c.pc).toFixed(1)+'%';
+    var far=c.gap>=4,up=!far&&c.pc>0,dn=!far&&c.pc<0,txt=far?'간격 큼':(up?'▲ ':dn?'▼ ':'')+Math.abs(c.pc).toFixed(1)+'%';
     cells+='<span style="display:flex;flex-direction:column;align-items:center;white-space:nowrap;'+(up?'color:#c0392b':dn?'color:#1f5fa8':'')+'">'+txt+(c.gap>1?'<span style="font-size:11px;line-height:14px;font-weight:500">'+c.gap+'개월 전</span>':'')+'</span>'}
   if(!any)return '<div style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><b>전월 대비</b> 3건 이상인 달이 둘 이상 없어 계산하지 않았습니다.</div>';
   return '<div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #cbc8c1;padding-top:6px"><span style="font-size:13px;line-height:20px;font-weight:700">전월 대비 <span style="font-weight:500;color:#423f3d">· 3건 이상인 달끼리 비교, 앞 달이 비면 \'N개월 전\' 대비 · ▲ 상승 ▼ 하락</span></span>'+
-    '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));font-size:12px;line-height:18px;font-weight:700;text-align:center">'+cells+'</div></div>';
+    '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));font-size:12px;line-height:18px;font-weight:700;text-align:center">'+cells+'</div>'+
+    '<span style="font-size:12px;line-height:18px;font-weight:500;color:#423f3d">비교하는 달과 4개월 이상 떨어져 있으면 증감률 대신 \'간격 큼\'으로 표시합니다.</span></div>';
 }
 
 function page2(D,N,evi){
