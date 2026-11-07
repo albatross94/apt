@@ -121,6 +121,23 @@ CLI로 하려면 `npm i -g vercel` 후 `vercel`(미리보기) / `vercel --prod`(
 - **공시가격은 필지(지번) 기준**으로 조회합니다. 한 필지에 단지가 여러 개면 함께 나오고, 실거래 자료에 지번이 없는 단지는 조회할 수 없습니다. 같은 동·호가 중복으로 내려오는 경우가 있어 하나로 합쳐서 보여줍니다. 가격은 만원 단위입니다.
 - **공식 통계가 아닙니다.** 화면 아래 "근거" 카드와 PDF 리포트에 "이 정보는 법적 효력이 없는 참고용이며, 본 자료는 제공(저장)일 기준 자체 집계로, 공식 통계와 다를 수 있습니다."라고 안내합니다. 거래 날짜 자체(조회 조건의 "계약일", 그래프·표의 계약일)는 실거래가 신고 자료의 계약일 그대로입니다.
 
+## 리포트 데이터 조회 (블로그 글 작성용)
+
+PDF 분석리포트에 들어가는 계산 결과를 PDF를 저장하지 않고 주소 하나로 JSON·텍스트로 받습니다. 별도 api 파일 없이 기존 `/api/trades` 라우트에 `kind=report`로 합쳤습니다(로그인한 브라우저 또는 로컬 서버에서 호출).
+
+```
+GET /api/trades?kind=report&apt=<단지명>&area=<59 | 84.97 | all>&months=12&type=all
+    &format=text            사람이 읽는 한국어 텍스트(표 포함). 생략하면 JSON
+    &list=areas             area 대신 쓰면 그 단지의 면적 목록과 유형별 건수
+    &lawd=41115&dong=<동>   지역(시군구 코드, 기본 41115 수원시 팔달구)·동 지정(같은 이름 단지 구분)
+```
+
+- `area`: 전용면적 값(`84.97`) 또는 `59` 같은 타입 라벨(전용 59㎡대 면적 전부), `all`은 기간 내 거래가 있는 모든 면적. 면적이 여럿이면 `results` 배열에 면적별로 담기며, 각 항목은 그 면적을 단독으로 조회한 결과와 같습니다.
+- `type`: `trade`(매매) · `jeonse`(전세) · `rent`(월세) · `all`(기본). `months`: 1~36(기본 12, 이번 달까지).
+- 잘못된 단지명·면적이면 400과 한국어 오류 메시지(비슷한 단지명 후보, 거래가 있는 면적 목록)를 돌려줍니다.
+- 계산은 PDF 화면과 같은 `public/report-stats.js` 한 파일을 씁니다(건수·최저최고·층별 범위·월별 중간값·증감률·전세가율·최근 6개월). 규칙: 매매는 해제·직거래 제외(제외 건수 표시), 3건 미만 "표본 적음"·0건 "거래 없음", 월별 중간값은 한 달 3건 이상인 달만, 비교 간격 4개월 이상 "간격 큼", 층 구간 저층 1~8·중층 9~16·고층 17층 이상(면적 전체 기준). 금액은 원 단위 숫자(`won`)와 표시 문자열(`display`)을 함께 줍니다.
+- 응답 헤더는 `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`입니다.
+
 ## 폴더 구성
 
 ```
@@ -128,12 +145,15 @@ server.js            로컬 실행용 서버 (API 라우팅 + 정적 파일)
 start.bat            Windows용 실행 파일
 lib/core.js          데이터 처리 공통 로직 (실거래가·공시가격 호출, 캐시, 라우팅)
 lib/auth.js          공용 비밀번호 로그인 (서명 쿠키 세션)
+lib/report-route.js  리포트 데이터 조회 (/api/trades?kind=report) JSON 조립·단지/면적 찾기
+lib/report-text.js   리포트 데이터 조회의 format=text 변환
 api/                 Vercel 서버리스 함수 (lib/core.js·lib/auth.js를 호출; aptdetail·aptinfo·landuse 포함)
 vercel.json          Vercel 배포 설정
 package.json         Node 버전 지정, npm start
 .vercelignore        Vercel 배포에서 제외할 파일
 public/index.html    화면 (실거래가 확인 리포트)
 public/report.js     PDF 분석리포트 양식 (A4 2~3쪽 HTML 생성)
+public/report-stats.js  통계 계산 공통 모듈 (PDF 화면과 리포트 데이터 조회 API가 같이 씀)
 public/regions.json  전국 시군구 코드 목록
 public/hospital.js  탭 전환과 병원·약국검색 화면
 lib/hira-sgg.json   법정동 시군구 코드 → 건강보험심사평가원 시도·시군구 코드 (scripts/build-hira-sgg.js 로 생성)

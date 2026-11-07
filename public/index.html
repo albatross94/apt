@@ -5,6 +5,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="/report-stats.js"></script>
 <script src="/report.js"></script>
 <style>
 #map-wrap{display:flex;gap:8px;height:520px}
@@ -624,7 +625,8 @@ const pyeong = (a) => Math.round(a / PY);
 const KINDS = { sale: { name: '매매', price: '거래가' }, jeonse: { name: '전세', price: '보증금' }, wolse: { name: '월세', price: '보증금' } };
 const kindOf = (k) => KINDS[k] || KINDS.sale;
 const state = { tab: 'sale', regions: [], raw: [], rawAll: [], from: '', to: '', lawd: '', data: null, areas: [], pick: null, band: null, cont: null, ask: { sale: {}, jeonse: {}, wolse: {} }, apt: null, aptKey: null, loadInfo: null };
-const LOW = 3;   // 이 건수 미만이면 "표본 적음"
+const RS = ReportStats;   // 건수·중간값·층별·월별 증감률 계산은 PDF와 API(kind=report)가 같은 report-stats.js를 쓴다
+const LOW = RS.LOW;   // 이 건수 미만이면 "표본 적음"
 const med = (a) => (a.length ? d3.median(a, (r) => r.price) : null);
 
 /* ---------- 조회 조건 ---------- */
@@ -787,7 +789,7 @@ async function loadTrades(lawd, from, to, onProgress, kind = 'sale') {
 const kindCache = new Map(), allCache = new Map();   // allCache: 걸러내기 전 전체 자료(뺀 건수 계산용)
 // 통계에 쓰는 거래: 해제(canceled)는 모든 종류에서, 직거래(gbn '직거래')는 매매에서 데이터 단계부터 뺀다.
 // 그래서 건수·중간값·최저최고·월별 증감률·그래프·목록·지도·단지비교·호가 비교·PDF가 모두 같은 거래를 쓴다.
-const keepOf = (kind) => (t) => !t.canceled && !(kind === 'sale' && t.gbn === '직거래');
+const keepOf = RS.keepOf;
 // 지금 고른 단지·전용면적에서 통계에서 뺀 건수. 해제된 직거래는 해제로만 센다.
 function exclCounts(kind = state.tab) {
   const all = allCache.get([kind, state.lawd, state.from, state.to].join('|')) || [];
@@ -992,7 +994,7 @@ function plotBox(parent) {
 }
 
 // 계약일–가격 점 그래프 (매매·전세)
-const bandOf = (t) => FLOOR_BANDS.find((b) => t.floor >= b[2] && t.floor <= b[3]) || FLOOR_BANDS[0];
+const bandOf = (t) => FLOOR_BANDS[RS.bandIndex(t.floor)];
 // 층 구간(저·중·고층) 범례. 구간마다 건수와 요약값을 보여 주고, withLine이면 월별 중간값 선 설명을 덧붙인다
 // 고른 층 구간(state.band)만 남긴다. 구간을 다시 누르면 전체로 돌아간다
 const byBand = (rows) => (state.band == null ? rows : rows.filter((t) => bandOf(t) === FLOOR_BANDS[state.band]));
@@ -1088,20 +1090,8 @@ function rentPlot(k, rows) {
 /* ---------- 월별 중간값과 증감률 (매매·전세·월세) ---------- */
 // 한 달 LOW(3)건 이상인 달만 중간값을 쓴다. 증감률은 바로 앞의 '중간값이 있는 달'과 비교하고,
 // 앞 달이 표본 부족이라 건너뛰었으면 gap(몇 개월 전과 비교했는지)을 함께 남긴다.
-function monthlyChange(rows, months, vf = med) {
-  const g = d3.group(rows, (t) => t.ym);
-  let prev = null;
-  return months.map((mo, i) => {
-    const v = g.get(mo) || [], m = v.length >= LOW ? vf(v) : null;
-    const o = { mo, n: v.length, med: m, dep: m != null && vf !== med ? med(v) : null, diff: null, pct: null, gap: 0 };
-    if (m != null) {
-      if (prev) { o.diff = m - prev.med; o.pct = o.diff / prev.med * 100; o.gap = i - prev.i; }
-      prev = { i, med: m };
-    }
-    return o;
-  });
-}
-const GAP_FAR = 4;   // 비교 간격이 이 개월 수 이상이면 증감률을 내지 않고 "간격 큼"으로 표시 (report.js chgRow도 4)
+const monthlyChange = (rows, months, vf = med) => RS.monthlyChange(rows, months, vf === med ? undefined : vf);
+const GAP_FAR = RS.GAP_FAR;   // 비교 간격이 이 개월 수 이상이면 증감률을 내지 않고 "간격 큼"으로 표시 (report.js chgRow도 4)
 const ymDot = (mo) => mo.replace('-', '.');
 const pctTxt = (p) => (p == null ? '—' : `${p > 0 ? '▲ ' : p < 0 ? '▼ ' : ''}${Math.abs(p).toFixed(1)}%`);
 const pctCls = (p) => (p > 0 ? 'gx-up' : p < 0 ? 'gx-down' : '');
@@ -1165,7 +1155,7 @@ function monthlyCard(body, rows) {
   body.append(k);
   const L = monthlyChange(rows, monthsInRange(), vf), ok = L.filter((o) => o.med != null);
   if (ok.length < 2) { k.append(mk('div', `한 달 ${LOW}건 이상인 달이 ${ok.length}개뿐이라 증감률을 낼 수 없습니다. 조회 기간을 늘리거나 층 구간 선택을 풀어 보세요.`, 'gx-empty')); return; }
-  const a = ok[0], b = ok.at(-1), tot = (b.med - a.med) / a.med * 100, few = ok.length < 3;   // 중간값을 낸 달이 3개월 미만이면 전체 변화는 퍼센트를 내지 않는다
+  const { a, b, tot, few } = RS.changeSummary(L);   // 중간값을 낸 달이 3개월 미만이면 전체 변화는 퍼센트를 내지 않는다
   const colored = (el, p) => { const v = el.querySelector('.v'); const c = pctCls(p); if (c) v.classList.add(c); return el; };
   k.append(statsRow(
     colored(stat('기간 전체 변화', few ? '표본 적음' : pctTxt(tot), `${ymDot(a.mo)} ${won1(a.med)} → ${ymDot(b.mo)} ${won1(b.med)}`), few ? 0 : tot),
@@ -1659,14 +1649,8 @@ function buildReportData() {
     months: labels.map((m) => m.slice(2, 4) + '.' + m.slice(5)), starts, daysLast: starts.at(-1),
     dots: [], meds: [], hoga: null, ref: null, unsupported: false,
   };
-  // 층 구간별 건수·중간값
-  D.floors = {};
-  FLOOR_BANDS.forEach((b, i) => {
-    const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null, lo: null, hi: null };
-    if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); f.dLo = d3.min(v, (t) => t.price); f.dHi = d3.max(v, (t) => t.price); f.rLo = d3.min(v, (t) => t.rent); f.rHi = d3.max(v, (t) => t.rent); } else { f.med = med(v); if (tab === 'jeonse') { f.dLo = d3.min(v, (t) => t.price); f.dHi = d3.max(v, (t) => t.price); } } }   // 월세 탭: 층별 보증금·월세 최저·최고(2쪽 범례)
-    if (tab === 'sale' && v.length) { f.lo = d3.min(v, (t) => t.price); f.hi = d3.max(v, (t) => t.price); }   // 층별 거래가격 구간(최저~최고)
-    D.floors['LMH'[i]] = f;
-  });
+  // 층 구간별 건수·중간값·범위 (PDF와 API가 같은 RS.floorStats)
+  D.floors = RS.floorStats(rows, tab);
   // 요약 수치
   if (tab === 'sale') {
     const latest = d3.max(rows, (t) => t.date), cut = d3.utcFormat('%Y-%m-%d')(d3.utcMonth.offset(new Date(latest + 'T00:00:00Z'), -3));
@@ -1674,7 +1658,7 @@ function buildReportData() {
     D.kpi = { n: rows.length, med: med(rows), min: d3.min(rows, (t) => t.price), max: d3.max(rows, (t) => t.price), recent: rec.length ? { med: med(rec), n: rec.length, from: mmdd(cut), to: mmdd(latest) } : null };
   } else if (tab === 'jeonse') {
     const sale = D0.sale.filter((t) => t.area === pick);
-    const ratio = (a) => (a.length && sale.length ? (med(a) / med(sale) * 100).toFixed(1) + '%' : null), r = ratio(rows);
+    const ratio = (a) => RS.ratioOf(a, sale), r = ratio(rows);
     D.kpi = { n: rows.length, med: med(rows), min: d3.min(rows, (t) => t.price), max: d3.max(rows, (t) => t.price),
       newMed: nw.length >= LOW ? med(nw) : null, newN: nw.length, renewMed: rn.length >= LOW ? med(rn) : null, renewN: rn.length,
       ratioRaw: r ? `${r} 전세 ${won(med(rows))} ÷ 매매 ${won(med(sale))}${ratio(nw) ? ' · 신규 계약만 ' + ratio(nw) : ''}` : '' };
@@ -1685,9 +1669,9 @@ function buildReportData() {
   // 같은 값이 여러 건이면 가장 최근 계약일을 쓰고 나머지 건수를 more로 남긴다.
   {
     const base = rows, val = tab === 'wolse' ? (t) => t.rent : (t) => t.price;
-    const at = (v) => { const m = base.filter((t) => val(t) === v).sort((a, b) => (a.date < b.date ? 1 : -1)); return { v, date: m[0].date.replaceAll('-', '.'), more: m.length - 1, dep: tab === 'wolse' ? m[0].price : null }; };
-    D.kpi.lo = base.length ? at(d3.min(base, val)) : null;
-    D.kpi.hi = base.length ? at(d3.max(base, val)) : null;
+    const ex = RS.extremes(base, val), at = (x) => (x ? { v: x.v, date: x.date.replaceAll('-', '.'), more: x.more, dep: tab === 'wolse' ? x.dep : null } : null);
+    D.kpi.lo = at(ex.lo);
+    D.kpi.hi = at(ex.hi);
   }
   if (tab !== 'sale') { D.legNew = nw.length; D.legRenew = rn.length; }
   // 그래프
@@ -1697,12 +1681,7 @@ function buildReportData() {
     D.xt = d3.range(0, Math.ceil(maxP / sx) * sx + 1, sx); D.yt = d3.range(0, Math.ceil(maxR / sy) * sy + 1, sy).reverse();
     D.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, x: t.price, y: t.rent }));
     D.warn = '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.';
-    const bins = [['보증금 5천만원 미만', 0, 5000], ['5천만원 ~ 1억원 미만', 5000, 10000], ['1억원 ~ 2억원 미만', 10000, 20000], ['2억원 이상 (반전세)', 20000, Infinity]];
-    D.tiers = bins.map(([lab, lo, hi]) => {
-      const v = rows.filter((t) => t.price >= lo && t.price < hi);
-      const rLo = v.length ? d3.min(v, (t) => t.rent) : null, rHi = v.length ? d3.max(v, (t) => t.rent) : null;
-      return { lab, n: `${v.length}건`, ok: v.length >= LOW, rngS: v.length ? (rLo === rHi ? `${fmt(rLo)}만원` : `${fmt(rLo)}~${fmt(rHi)}만원`) : '-', rng: v.length ? `${fmt(d3.min(v, (t) => t.rent))} ~ ${fmt(d3.max(v, (t) => t.rent))}만원` : '-' };
-    });
+    D.tiers = RS.depositBands(rows, fmt).map((t) => ({ lab: t.lab, n: `${t.n}건`, ok: t.ok, rngS: t.rngS, rng: t.rng }));
   } else {
     const ys = d3.extent(rows, (t) => t.price / 10000), st = niceStep(ys[1] - ys[0] || 0.1, [0.1, 0.2, 0.5, 1, 2, 5, 10, 20], 6);
     const lo = Math.floor(ys[0] / st + 1e-9) * st, hi = Math.max(Math.ceil(ys[1] / st - 1e-9) * st, lo + st);
@@ -1711,21 +1690,21 @@ function buildReportData() {
     // 월별 중간값: 한 달 3건 이상인 달만
     for (const [ym, v] of d3.group(rows, (t) => t.ym)) {
       const mi = mlist.indexOf(ym);
-      if (v.length >= 3 && mi >= 0) D.meds.push({ mi, d: starts[mi] + 15, p: med(v) / 10000 });
+      if (v.length >= LOW && mi >= 0) D.meds.push({ mi, d: starts[mi] + 15, p: med(v) / 10000 });
     }
     D.meds.sort((a, b) => a.d - b.d);
   }
   // 현재 호가와 실거래 비교 (askCard와 같은 기준) — 호가를 입력했으면 hoga, 아니면 최근 6개월 실거래 기준(ref)
   const A = { price: '', rent: '', floor: '', src: '', date: '', ...state.ask[tab] }, wolse = tab === 'wolse', PN = tab === 'sale' ? '거래가' : '보증금';
-  const cutM = mlist.length > 6 ? mlist[mlist.length - 6] : mlist[0], rec6 = rows.filter((t) => t.ym >= cutM), recOk = rec6.length >= LOW, use = recOk ? rec6 : rows;
+  const { cutM, rec6, recOk, use } = RS.recent6(rows, mlist);
   const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price), rm = wolse ? d3.median(use, (t) => t.rent) : null;
   const rgTxt = `${won(lo)} ~ ${won(hi)}`;
   const basis = `같은 단지 · 전용 ${pick}㎡ · ${recOk ? `최근 6개월(${cutM.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec6.length}건뿐)`} ${KN} 거래 ${use.length}건`;
   const price = parseFloat(A.price), rent = parseFloat(A.rent), floor = parseInt(A.floor, 10), sgn = (v) => (v >= 0 ? '+' : '−');
   if (!(price > 0)) {
     // 3쪽 "최근 6개월 실거래 기준"의 층별 최저~최고(n건): 비교에 쓴 거래(use)를 2쪽 층별 막대와 같은 층 구간으로 나눈다. 월세는 지금 범위와 같은 값(보증금).
-    const fr = {};
-    FLOOR_BANDS.forEach((b, i) => { const v = use.filter((t) => bandOf(t) === b); fr['LMH'[i]] = { rng: b[1], n: v.length, lo: v.length ? d3.min(v, (t) => t.price) : null, hi: v.length ? d3.max(v, (t) => t.price) : null }; });
+    const fr = RS.floorStats(use, 'sale');   // 종류와 상관없이 거래가·보증금(price)의 층별 최저~최고가 필요해 sale 방식으로 센다
+    for (const k of Object.keys(fr)) fr[k] = { rng: fr[k].rng, n: fr[k].n, lo: fr[k].lo, hi: fr[k].hi };
     D.ref = { basis, med: won(mdn), rent: wolse ? fmtRent(rm) + "만원" : "", range: rgTxt, floors: fr };
   } else {
     const diff = price - mdn, hasFloor = floor > 0;

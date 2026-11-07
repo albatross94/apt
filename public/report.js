@@ -7,10 +7,8 @@ var co = function () { return [CFG.name, CFG.sub, repLine(), CFG.tel].filter(Boo
 var offLine = function () { return [CFG.addr, CFG.reg ? '등록번호 ' + CFG.reg : ''].filter(Boolean).join(' · '); };
 var subLine = function () { return [CFG.sub, repLine()].filter(Boolean).join(' · '); };
 var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
-function fmt(v){var sign=v<0?'−':'';v=Math.abs(Math.round(v));var e=Math.floor(v/10000),m=v%10000;
-  if(e&&m)return sign+e+'억 '+m.toLocaleString('en-US')+'만원';
-  if(e)return sign+e+'억원';
-  return sign+m.toLocaleString('en-US')+'만원'}
+var RS=window.ReportStats;   // 금액 표기·층별 문장·범위는 API(kind=report)와 같은 report-stats.js를 쓴다
+function fmt(v){return RS.won(v)}
 function h2(t){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:20px;background:#8e1b1c;display:block"></span><h2 style="margin:0;font-size:20px;line-height:28px;font-weight:700">'+esc(t)+'</h2></div>'}
 function lab(l,v){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:16px;line-height:26px;font-weight:700;word-break:keep-all">'+esc(v)+'</span></div>'}
 // 2·3쪽 머리글은 항상 한 줄. 단지명(.rn-name)만 줄어든다: CSS로 한 줄 고정 + 넘치면 끝을 '…'로 줄이고(text-overflow),
@@ -28,19 +26,14 @@ var ORD=['','가장','두 번째로','세 번째로','네 번째로','다섯 번
 var FL=[['L','저층'],['M','중층'],['H','고층']];
 
 function floorParts(D){
-  return FL.map(function(z){var f=D.floors[z[0]];
-    if(!(f.n>0))return z[1]+'은 거래 없음';
-    var v=D.type==='월세'?(f.rent!=null?fmt(f.rent):null):(f.med!=null?fmt(f.med):null);
-    return v?z[1]+' '+v+'('+f.n+'건'+(f.n<3?'·표본 적음':'')+')':z[1]+' '+f.n+'건'});
+  return RS.floorMedParts(D.floors,function(f){return D.type==='월세'?(f.rent!=null?f.rent:null):f.med},fmt);
 }
 // 층별 월세 범위(월세 탭 1쪽): 2쪽 범례와 같은 값. 1건이면 값 하나, 0건이면 '거래 없음'
 function floorRentParts(D){
-  return FL.map(function(z){var f=D.floors[z[0]];
-    if(!(f.n>0))return z[1]+'은 거래 없음';
-    return z[1]+' '+rngTxt(f.rLo,f.rHi)+'('+f.n+'건'+(f.n<3?'·표본 적음':'')+')'});
+  return RS.floorMedParts(D.floors,function(f){return f},function(f){return rngTxt(f.rLo,f.rHi)});
 }
 // 최저~최고 표기: 8억 7,000만~11억 9,000만원 (앞 값의 끝 '원'을 떼어 붙인다)
-function rngTxt(lo,hi){var a=fmt(lo);return lo===hi?a:a.replace(/원$/,'')+'~'+fmt(hi)}
+function rngTxt(lo,hi){return RS.rngTxt(lo,hi)}
 // 층별 거래가격 구간(매매). 직거래·해제는 이미 자료에서 빠져 있다. 3건 미만이면 '표본 적음', 0건이면 '거래 없음'
 function floorRangeParts(D){
   return FL.map(function(z){var f=D.floors[z[0]];
