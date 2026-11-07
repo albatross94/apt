@@ -12,7 +12,7 @@ function fmt(v){var sign=v<0?'−':'';v=Math.abs(Math.round(v));var e=Math.floor
   if(e)return sign+e+'억원';
   return sign+m.toLocaleString('en-US')+'만원'}
 function h2(t){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:20px;background:#8e1b1c;display:block"></span><h2 style="margin:0;font-size:20px;line-height:28px;font-weight:700">'+esc(t)+'</h2></div>'}
-function lab(l,v){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:16px;line-height:26px;font-weight:700">'+esc(v)+'</span></div>'}
+function lab(l,v){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:16px;line-height:26px;font-weight:700;word-break:keep-all">'+esc(v)+'</span></div>'}
 function slim(D,n,N){return '<div style="background:#8e1b1c;color:#fff;padding:12px 40px;display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><span style="font-size:16px;line-height:26px;font-weight:800">'+esc(D.complex)+' · 전용 '+esc(D.sel.a)+'㎡ 실거래가 분석리포트</span></div><span style="font-size:13px;line-height:20px;font-weight:700">'+n+' / '+N+'</span></div>'}
 function foot(n,N){return '<div style="margin:0 40px;padding:10px 0 16px 0;border-top:1px solid #423f3d;display:flex;justify-content:space-between;font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><span style="display:flex;flex-direction:column"><span>'+esc(co())+'</span>'+(offLine()?'<span style="font-size:8px;line-height:12px">'+esc(offLine())+'</span>':'')+'</span><span>'+n+' / '+N+'</span></div>'}
 var BODY='padding:16px 40px 0 40px;display:flex;flex-direction:column;gap:16px;flex:1 1 auto';
@@ -27,7 +27,7 @@ function floorParts(D){
 }
 // 최저~최고 표기: 8억 7,000만~11억 9,000만원 (앞 값의 끝 '원'을 떼어 붙인다)
 function rngTxt(lo,hi){var a=fmt(lo);return lo===hi?a:a.replace(/원$/,'')+'~'+fmt(hi)}
-// 층별 거래가격 구간(매매). 최저·최고는 직거래 제외(D.floors.*.lo/hi), 건수 n은 직거래 포함 그대로. 3건 미만이면 '표본 적음', 0건이면 '거래 없음'
+// 층별 거래가격 구간(매매). 직거래·해제는 이미 자료에서 빠져 있다. 3건 미만이면 '표본 적음', 0건이면 '거래 없음'
 function floorRangeParts(D){
   return FL.map(function(z){var f=D.floors[z[0]];
     if(!(f.n>0))return z[1]+' 거래 없음';
@@ -46,8 +46,8 @@ function readLines(D){
   else{l1='<b>'+ORD[Math.min(rank,9)]+' 거래가 많습니다.</b> '+tops.join('·')+' 다음'+(nb?'이고, 같은 '+Math.floor(+D.sel.a)+'㎡대 '+nb.a+'㎡는 '+nb.n+'건입니다.':'입니다.')}
   var k=D.kpi,l2,l3;
   if(D.type==='매매'){
-    // 매매: 최근 가격 문장(l2)은 두지 않는다. 층별 문장은 층별 거래가격 구간(최저~최고, 직거래 제외)으로 보여 준다
-    l3='<b>층별 거래가격 구간(직거래 제외)</b> '+floorRangeParts(D).join(' · ')+'.';
+    // 매매: 최근 가격 문장(l2)은 두지 않는다. 층별 문장은 층별 거래가격 구간(최저~최고)으로 보여 준다
+    l3='<b>층별 거래가격 구간</b> '+floorRangeParts(D).join(' · ')+'.';
   }else if(D.type==='전세'){
     var rm=/^([\d.]+)%\s*(.*)$/.exec(k.ratioRaw||'');
     l2=rm?'<b>전세가율은 '+rm[1]+'%입니다.</b> 매매 중간값 대비 전세 중간값의 비율입니다('+rm[2]+'). 대출 등 권리관계는 반영되지 않았습니다.':null;   // 같은 기간 매매 거래가 없어 계산할 수 없으면 이 줄을 뺀다
@@ -65,14 +65,14 @@ function readLines(D){
 }
 
 /* 핵심 요약: 가로 3칸(같은 크기). 거래 건수 / 가장 낮은 값 / 가장 높은 값.
-   최저·최고는 화면 '그래프에 쓴 거래 목록'과 같은 기준(매매는 직거래 제외, 월세는 월세 금액 기준)이고 D.kpi.lo/hi에 담겨 온다.
+   최저·최고는 화면 '그래프에 쓴 거래 목록'과 같은 거래(매매는 직거래·해제가 이미 빠져 있음, 월세는 월세 금액 기준)이고 D.kpi.lo/hi에 담겨 온다.
    큰 금액이 칸을 넘치지 않도록 세 칸의 글자 크기는 가장 긴 값에 맞춰 같게 줄인다. */
 function summary(D){
   var k=D.kpi,T=D.type,W=T==='월세',P=T==='매매'?'거래':W?'월세':'보증금';
   var ext=function(x){return x?fmt(x.v):'—'};
   var when=function(x){if(!x)return '거래 없음';
     return '계약일 '+x.date+(x.more>0?' 외 '+x.more+'건':'')+(W&&x.dep!=null?' · 보증금 '+fmt(x.dep):'')};
-  var cnt=T==='매매'?'해제 거래 제외':D.period.replace(/ /g,'');
+  var cnt=T==='매매'?'직거래·해제 제외':D.period.replace(/ /g,'');
   var vals=[ext(k.lo),ext(k.hi)],len=Math.max(vals[0].length,vals[1].length),sz=len<=7?32:len<=10?28:len<=12?25:22;
   var cell=function(l,v,s,sub){return '<div style="background:#fff;padding:14px 16px;display:flex;flex-direction:column;min-width:0"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:'+s+'px;line-height:44px;font-weight:800;white-space:nowrap">'+esc(v)+'</span><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(sub)+'</span></div>'};
   var cells=[cell('거래 건수',k.n+'건',sz,cnt),cell('가장 낮은 '+(T==='매매'?'거래':P),vals[0],sz,when(k.lo)),cell('가장 높은 '+(T==='매매'?'거래':P),vals[1],sz,when(k.hi))];
@@ -91,7 +91,7 @@ function parkLine(D){
 }
 
 function page1(D,N){
-  var meta=D.cust?[['고객',D.cust.name],['연락처',D.cust.phone],['저장일시',D.saved],['조회 기간',D.period]]:[['저장일시',D.saved],['조회 기간',D.period],['가장 최근 계약일',D.latest||'—'],['기준',D.type==='매매'?'계약일 · 해제 제외':'계약일 기준']];
+  var meta=D.cust?[['고객',D.cust.name],['연락처',D.cust.phone],['저장일시',D.saved],['조회 기간',D.period]]:[['저장일시',D.saved],['조회 기간',D.period],['가장 최근 계약일',D.latest||'—'],['기준',D.type==='매매'?'계약일(직거래·해제 제외)':'계약일 기준']];
   var maxN=Math.max.apply(null,D.areas.map(function(z){return z.n}))||1;
   var r2=function(v){return Math.round(+v*100)/100},hhBy={},hasHh=D.park&&D.park.areas&&D.park.areas.length;
   if(hasHh)D.park.areas.forEach(function(p){hhBy[r2(p[0])]=p[1]});
@@ -111,7 +111,7 @@ function page1(D,N){
 }
 
 function evidence(D){
-  var proc=D.proc||'원본 거래 건을 그대로 사용했고, 해제된 매매 거래만 통계에서 뺐습니다. 전월세 자료에는 해제 거래가 없습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.';
+  var proc=D.proc||'원본 거래 건을 그대로 사용했고, 매매는 해제된 거래와 직거래를 통계에서 뺐습니다. 전월세 자료에는 해제·직거래 구분이 없습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.';
   var row=function(a,b){return '<span style="font-weight:700;color:#423f3d">'+a+'</span><span>'+esc(b)+'</span>'};
   return '<div style="background:#fff;padding:12px 24px 16px 24px;display:flex;flex-direction:column;gap:8px">'+h2('이 자료를 믿고 보실 수 있는 근거')+
   '<div style="display:grid;grid-template-columns:76px minmax(0,1fr);column-gap:12px;row-gap:2px;font-size:13px;line-height:20px">'+row('출처',D.src)+row('조회 조건',D.cond)+row('자료 기준',D.basis)+row('가공 방법',proc)+'</div>'+
@@ -167,8 +167,8 @@ var SVGF='font-family:\'Noto Sans KR\',\'Malgun Gothic\',\'Apple SD Gothic Neo\'
 function svgBox(w,h,label,inner){return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" role="img" aria-label="'+esc(label)+'" style="display:block;'+SVGF+'">'+inner+'</svg>'}
 function svgT(x,y,txt,o){o=o||{};return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-size="'+(o.sz||12)+'"'+(o.b?' font-weight="700"':'')+' fill="'+(o.fill||'#423f3d')+'"'+(o.anchor?' text-anchor="'+o.anchor+'"':'')+'>'+esc(txt)+'</text>'}
 
-/* 층별 거래가격 구간(매매 2쪽): 층마다 최저~최고 가로 막대 + 중간값 세로 눈금. 최저·최고는 직거래 제외(D.floors.*.lo/hi),
-   건수·중간값은 직거래 포함 그대로. 3건 미만인 층은 막대 대신 '표본 적음'. 색은 점 그래프의 층 색(저층 회색·중층 빨강·고층 노랑)과 같다. */
+/* 층별 거래가격 구간(매매 2쪽): 층마다 최저~최고 가로 막대와 건수. 직거래·해제는 이미 자료에서 빠져 있다(D.floors.*.lo/hi).
+   3건 미만인 층은 막대 대신 '표본 적음'. 색은 점 그래프의 층 색(저층 회색·중층 빨강·고층 노랑)과 같다. */
 function floorBars(D){
   var COL={L:'#423f3d',M:'#ae353d',H:'#dfc10e'};
   var rows=FL.map(function(z){var f=D.floors[z[0]];return {k:z[0],name:z[1],f:f,ok:f.n>=3&&f.lo!=null}});
@@ -176,7 +176,7 @@ function floorBars(D){
   var W=666,BX0=124,BX1=448,RH=40,top=6,H=top+RH*3+24,x,ticks=[],t0=0,t1=1,s='';
   if(okR.length){
     var lo=Infinity,hi=-Infinity;
-    okR.forEach(function(r){lo=Math.min(lo,r.f.lo/1e4,r.f.med/1e4);hi=Math.max(hi,r.f.hi/1e4,r.f.med/1e4)});
+    okR.forEach(function(r){lo=Math.min(lo,r.f.lo/1e4);hi=Math.max(hi,r.f.hi/1e4)});
     var span=hi-lo,step=[0.1,0.2,0.5,1,2,5,10].filter(function(v){return span/v<=5})[0]||10;
     t0=Math.floor(lo/step+1e-9)*step;t1=Math.ceil(hi/step-1e-9)*step;if(t1<=t0)t1=t0+step;
     for(var q=0,nq=Math.round((t1-t0)/step);q<=nq;q++)ticks.push(+(t0+q*step).toFixed(2));
@@ -188,17 +188,16 @@ function floorBars(D){
     var cy=top+RH*i+RH/2,f=r.f;
     s+=mark(r.k,0,9,cy-7)+svgT(20,cy-3,r.name,{sz:14,b:1,fill:'#202227'})+svgT(20,cy+15,f.rng||'',{sz:11});   // 층 구간(몇 층~몇 층)은 작은 글씨
     if(r.ok){
-      var x1=x(f.lo/1e4),x2=x(f.hi/1e4),mx=x(f.med/1e4);
+      var x1=x(f.lo/1e4),x2=x(f.hi/1e4);
       s+='<rect x="'+x1.toFixed(1)+'" y="'+(cy-8)+'" width="'+Math.max(x2-x1,4).toFixed(1)+'" height="16" fill="'+COL[r.k]+'"'+(r.k==='L'?' fill-opacity="0.6"':'')+(r.k==='H'?' stroke="#202227" stroke-width="1"':'')+'/>'+
-        '<path d="M'+mx.toFixed(1)+' '+(cy-12)+'V'+(cy+12)+'" stroke="#fff" stroke-width="4.5"/><path d="M'+mx.toFixed(1)+' '+(cy-12)+'V'+(cy+12)+'" stroke="#202227" stroke-width="2"/>'+
-        svgT(W,cy-3,rngTxt(f.lo,f.hi)+' ('+f.n+'건)',{sz:13,b:1,anchor:'end',fill:'#202227'})+svgT(W,cy+15,'중간값 '+fmt(f.med),{sz:11,anchor:'end'});
+        svgT(W,cy+5,rngTxt(f.lo,f.hi)+' ('+f.n+'건)',{sz:13,b:1,anchor:'end',fill:'#202227'});
     }else{
       s+=svgT(BX0+4,cy+5,f.n>0?'표본 적음':'거래 없음',{sz:13})+(f.n>0?svgT(W,cy+5,'('+f.n+'건)',{sz:13,anchor:'end'}):'');
     }
   });
   return '<div style="background:#fff;padding:12px 24px 12px 24px;display:flex;flex-direction:column;gap:6px">'+h2('층별 거래가격 구간')+
-    '<span style="font-size:12px;line-height:18px;font-weight:500;color:#423f3d">막대는 최저~최고(직거래 제외), 세로 눈금은 중간값 · 3건 미만인 층은 \'표본 적음\' · 층 구간·색은 위 점 그래프와 같음</span>'+
-    svgBox(W,H,'전용 '+D.sel.a+'㎡ 층별 거래가격 구간(최저~최고)과 중간값',s)+'</div>';
+    '<span style="font-size:12px;line-height:18px;font-weight:500;color:#423f3d">막대는 최저~최고 · 3건 미만인 층은 \'표본 적음\' · 층 구간·색은 위 점 그래프와 같음</span>'+
+    svgBox(W,H,'전용 '+D.sel.a+'㎡ 층별 거래가격 구간(최저~최고)',s)+'</div>';
 }
 
 /* 월별 증감률 막대그래프(매매·전세 2쪽). 앱 monthlyChange와 같은 규칙: 3건 이상인 달(D.meds)끼리만 비교하고,
@@ -238,7 +237,7 @@ function monthBars(D,c0,cols){
 
 function page2(D,N,evi){
   var T=D.type,k=D.kpi;
-  var leg=function(key,name,f){var med='';if(f.n&&T==='월세'&&f.dep!=null)med=' · 중간값 보증금 '+fmt(f.dep)+' · 월세 '+fmt(f.rent);else if(f.n&&f.med)med=' · 중간값 '+fmt(f.med);
+  var leg=function(key,name,f){var med='';if(f.n&&T==='월세'&&f.dep!=null)med=' · 중간값 보증금 '+fmt(f.dep)+' · 월세 '+fmt(f.rent);else if(f.n&&f.med&&T!=='매매')med=' · 중간값 '+fmt(f.med);
     return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b> '+esc(f.rng||'')+' · '+f.n+'건'+med+'</span></div>'};
   var legs=leg('L','저층',D.floors.L)+leg('M','중층',D.floors.M)+leg('H','고층',D.floors.H);
   if(T==='전세')legs+='<div style="display:flex;align-items:center;gap:8px">'+SV.V+'<span><b>월별 중간값</b> 한 달 3건 이상일 때만 표시</span></div>';
@@ -248,7 +247,7 @@ function page2(D,N,evi){
   var cap;
   if(T==='월세')cap='';
   else{var minT=D.ticks[D.ticks.length-1];
-    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.lo&&k.hi?' · 최저 '+fmt(k.lo.v)+' · 중간값 '+fmt(k.med)+' · 최고 '+fmt(k.hi.v)+(T==='매매'?' <span style="font-size:11px">(최저·최고는 직거래 제외)</span>':''):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
+    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.lo&&k.hi?' · 최저 '+fmt(k.lo.v)+(T==='매매'?'':' · 중간값 '+fmt(k.med))+' · 최고 '+fmt(k.hi.v):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
   var warn=T==='월세'?'<div style="background:#e6d9ce;padding:8px 12px;font-size:13px;line-height:20px;font-weight:700">'+esc(D.warn)+'</div>':'';
   var lower;
   if(T==='월세'){

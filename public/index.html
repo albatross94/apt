@@ -662,11 +662,13 @@ $('go').onclick = async () => {
     const kind = $('kind').value;
     const trades = await loadTrades(sel.value, from, to, (d, n) => { st.textContent = `불러오는 중… ${d}/${n}개월`; }, kind);
     state.from = from; state.to = to; state.lawd = sel.value; state.tab = kind;
+    const key = [kind, state.lawd, from, to].join('|');
+    allCache.clear(); allCache.set(key, trades);   // 뺀 건수(해제·직거래)를 세려고 걸러내기 전 자료도 보관한다
     state.rawAll = trades;
     state.loadInfo = { at: new Date(), months: monthsInRange(from, to).length, canceled: trades.filter((t) => t.canceled).length };
-    state.raw = trades.filter((t) => !t.canceled);
-    kindCache.clear(); kindCache.set([kind, state.lawd, from, to].join('|'), Promise.resolve(state.raw));
-    st.textContent = `${kindOf(kind).name} 거래 ${state.raw.length.toLocaleString()}건` + (kind === 'sale' ? ' (해제 제외)' : '');
+    state.raw = trades.filter(keepOf(kind));
+    kindCache.clear(); kindCache.set(key, Promise.resolve(state.raw));
+    st.textContent = `${kindOf(kind).name} 거래 ${state.raw.length.toLocaleString()}건` + (kind === 'sale' ? ' (해제·직거래 제외)' : '');
     buildAptOptions();
     mapReset();
   } catch (e) { st.className = 'err'; st.textContent = e.message; }
@@ -782,10 +784,19 @@ async function loadTrades(lawd, from, to, onProgress, kind = 'sale') {
 
 /* ---------- 같은 단지의 매매·전세·월세 ---------- */
 // 조회한 종류는 go 버튼이 캐시에 넣어 두고, 나머지 두 종류는 같은 지역·기간으로 처음 열 때 불러온다.
-const kindCache = new Map();
+const kindCache = new Map(), allCache = new Map();   // allCache: 걸러내기 전 전체 자료(뺀 건수 계산용)
+// 통계에 쓰는 거래: 해제(canceled)는 모든 종류에서, 직거래(gbn '직거래')는 매매에서 데이터 단계부터 뺀다.
+// 그래서 건수·중간값·최저최고·월별 증감률·그래프·목록·지도·단지비교·호가 비교·PDF가 모두 같은 거래를 쓴다.
+const keepOf = (kind) => (t) => !t.canceled && !(kind === 'sale' && t.gbn === '직거래');
+// 지금 고른 단지·전용면적에서 통계에서 뺀 건수. 해제된 직거래는 해제로만 센다.
+function exclCounts(kind = state.tab) {
+  const all = allCache.get([kind, state.lawd, state.from, state.to].join('|')) || [];
+  const mine = all.filter((t) => aptKey(t) === state.aptKey && (state.pick == null || t.area === state.pick));
+  return { canceled: mine.filter((t) => t.canceled).length, direct: kind === 'sale' ? mine.filter((t) => !t.canceled && t.gbn === '직거래').length : 0 };
+}
 function kindRows(kind) {
   const key = [kind, state.lawd, state.from, state.to].join('|');
-  if (!kindCache.has(key)) kindCache.set(key, loadTrades(state.lawd, state.from, state.to, null, kind).then((r) => r.filter((t) => !t.canceled)));
+  if (!kindCache.has(key)) kindCache.set(key, loadTrades(state.lawd, state.from, state.to, null, kind).then((r) => { allCache.set(key, r); return r.filter(keepOf(kind)); }));
   return kindCache.get(key);
 }
 
@@ -875,18 +886,19 @@ function render() {
 function saleBody(body, rows) {
   const k = card(null);
   const latest = d3.max(rows, (t) => t.date);
-  const direct = rows.filter((t) => t.gbn !== '직거래');   // 최저·최고는 '그래프에 쓴 거래 목록'과 같이 직거래를 뺀다(중간값·건수·그래프 점은 그대로)
   let rec = [], cut = '';
   if (latest) {
     cut = d3.utcFormat('%Y-%m-%d')(d3.utcMonth.offset(new Date(latest + 'T00:00:00Z'), -3));
     rec = rows.filter((t) => t.date > cut);
   }
   k.append(statsRow(
-    stat('거래 건수', `${fmt(rows.length)}건`, '해제 거래 제외'),
+    stat('거래 건수', `${fmt(rows.length)}건`, '직거래·해제 제외'),
     stat('중간값', rows.length ? won(med(rows)) : '-', '가장 가운데 거래'),
-    stat('가장 낮은 거래', direct.length ? won(d3.min(direct, (t) => t.price)) : '-', '직거래 제외'),
-    stat('가장 높은 거래', direct.length ? won(d3.max(direct, (t) => t.price)) : '-', '직거래 제외'),
+    stat('가장 낮은 거래', rows.length ? won(d3.min(rows, (t) => t.price)) : '-'),
+    stat('가장 높은 거래', rows.length ? won(d3.max(rows, (t) => t.price)) : '-'),
     stat('최근 3개월 중간값', rec.length ? won(med(rec)) : '-', rec.length ? `${rec.length}건 · ${mmdd(cut)} ~ ${mmdd(latest)}` : '최근 3개월 거래 없음')));
+  const ex = exclCounts('sale');
+  k.append(mk('p', `이 면적에서 직거래 ${ex.direct}건, 해제 ${ex.canceled}건은 통계에서 뺐습니다.`, 'gx-note'));
   body.append(k);
   dotChart(body, rows, '실거래가 매매 그래프', `전용 ${state.pick}㎡ · ${fmt(rows.length)}건 · 점 위에 손가락이나 마우스를 올리면 계약일, 동, 층, 금액이 나옵니다.`, [], true);
   monthlyCard(body, rows);
@@ -1057,8 +1069,8 @@ function dotChart(body, rows, title, note, legendItems, bands) {
     xticks: d3.utcMonth.every(el.clientWidth < 520 ? step * 2 : step), xfmt: d3.utcFormat('%y.%m'), yticks: 6, yfmt: (d) => eok(d) + '억',
     tip: (t) => [`${t.date} · ${t.dong} · ${t.floor}층`, `${isSale ? '거래가' : '보증금'} ${won(t.price)}` + (t.gbn ? ` · ${t.gbn}` : '')],
   });
-  const pr = rows.map((t) => t.price), ex = isSale ? rows.filter((t) => t.gbn !== '직거래').map((t) => t.price) : pr;   // 매매 최저·최고는 직거래 제외
-  k.append(mk('p', `표본 ${fmt(rows.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${ex.length ? won(d3.min(ex)) : '-'} · 중간값 ${won(d3.median(pr))} · 최고 ${ex.length ? won(d3.max(ex)) : '-'}${isSale ? '(최저·최고는 직거래 제외)' : ''} · 출처 국토교통부 실거래가 공개시스템(계약일 기준)${bands ? ' · 세로축은 0원에서 시작하지 않고 이 면적의 가격 범위에 맞춰 표시했으니 눈금의 숫자를 함께 읽어 주세요.' : ''}`, 'gx-note'));
+  const pr = rows.map((t) => t.price);
+  k.append(mk('p', `표본 ${fmt(rows.length)}건 · ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · 최저 ${won(d3.min(pr))} · 중간값 ${won(d3.median(pr))} · 최고 ${won(d3.max(pr))} · 출처 국토교통부 실거래가 공개시스템(계약일 기준)${bands ? ' · 세로축은 0원에서 시작하지 않고 이 면적의 가격 범위에 맞춰 표시했으니 눈금의 숫자를 함께 읽어 주세요.' : ''}`, 'gx-note'));
 }
 
 // 보증금–월세 점 그래프 (월세). 두 축 모두 0에서 시작한다.
@@ -1171,14 +1183,12 @@ function monthlyCard(body, rows) {
 
 function tradeList(body, rows) {
   const sale = state.tab === 'sale', wolse = state.tab === 'wolse';
-  const k = card('그래프에 쓴 거래 목록', `전용 ${state.pick}㎡ · ${rows.length.toLocaleString()}건 · 최근 거래순 · 최고가·최저가는 붉은색으로 표시` + (sale ? ' (직거래 제외)' : '') + (rows.length > 500 ? ' (최근 500건만 표시)' : ''));
+  const k = card('그래프에 쓴 거래 목록', `전용 ${state.pick}㎡ · ${rows.length.toLocaleString()}건 · 최근 거래순 · 최고가·최저가는 붉은색으로 표시` + (rows.length > 500 ? ' (최근 500건만 표시)' : ''));
   const list = [...rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 500);
-  // 조회기간(rows) 전체 기준으로 최고가·최저가를 찾되, 매매는 직거래(중개 없이 신고된 거래)를 빼고 계산한다
-  const basis = sale ? rows.filter((r) => r.gbn !== '직거래') : rows;
-  const maxP = basis.length ? d3.max(basis, (r) => r.price) : null;
-  const minP = basis.length ? d3.min(basis, (r) => r.price) : null;
+  // 조회기간(rows) 전체 기준으로 최고가·최저가를 찾는다 (직거래·해제는 이미 자료에서 빠져 있다)
+  const maxP = rows.length ? d3.max(rows, (r) => r.price) : null;
+  const minP = rows.length ? d3.min(rows, (r) => r.price) : null;
   const priceCell = (r) => {
-    if (sale && r.gbn === '직거래') return fmt(r.price);
     if (maxP === minP || (r.price !== maxP && r.price !== minP)) return fmt(r.price);
     return mk('span', fmt(r.price), 'gx-extreme');
   };
@@ -1215,9 +1225,9 @@ function askCard(body, rows, tab) {
     const basis = recOk ? `최근 6개월(${cut.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec.length}건뿐)`;
     out.replaceChildren();
     if (!use.length) { out.append(mk('p', '이 전용면적은 조회 기간에 거래가 없어 비교할 수 없습니다.', 'gx-note')); return; }
-    const mdn = med(use), rg = tab === 'sale' ? use.filter((t) => t.gbn !== '직거래') : use, lo = d3.min(rg, (t) => t.price), hi = d3.max(rg, (t) => t.price);   // 매매 실거래 범위는 직거래 제외
+    const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price);
     const a = { price: '', rent: '', floor: '', src: '', date: '', ...A }, price = parseFloat(a.price), rent = parseFloat(a.rent), floor = parseInt(a.floor, 10);
-    const pairs = [['비교 기준', `같은 단지 · 전용 ${state.pick}㎡ · ${basis} ${KN} 거래 ${use.length}건`], ['실거래 중간값', won(mdn)], ['실거래 범위', rg.length ? `${won(lo)} ~ ${won(hi)}${tab === 'sale' ? ' (직거래 제외)' : ''}` : '—']];
+    const pairs = [['비교 기준', `같은 단지 · 전용 ${state.pick}㎡ · ${basis} ${KN} 거래 ${use.length}건`], ['실거래 중간값', won(mdn)], ['실거래 범위', `${won(lo)} ~ ${won(hi)}`]];
     if (wolse) pairs.splice(2, 0, ['실거래 월세 중간값', `${fmtRent(d3.median(use, (t) => t.rent))}만원`]);
     const kv = mkKv(pairs);
     if (use.length < LOW) kv.children[1].append(mk('span', '표본 적음', 'gx-badge'));
@@ -1445,7 +1455,7 @@ function drawCmp(body) {
     ['매매 거래 건수', (s) => `${s.sale.length}건`],
     ['매매 중간값', (s) => money(s.sale)],
     ['매매 전용 평당가', (s) => perPy(s.sale)],
-    ['매매 최저 ~ 최고 (직거래 제외)', (s) => { const d = s.sale.filter((t) => t.gbn !== '직거래'); return d.length ? `${won(d3.min(d, (t) => t.price))} ~ ${won(d3.max(d, (t) => t.price))}` : '—'; }],
+    ['매매 최저 ~ 최고', (s) => (s.sale.length ? `${won(d3.min(s.sale, (t) => t.price))} ~ ${won(d3.max(s.sale, (t) => t.price))}` : '—')],
     ['최근 3개월 매매 중간값', (s) => (s.rec.length ? low(s.rec, won(m(s.rec))) : '—')],
     ['전세 거래 건수', (s) => `${s.jeonse.length}건`],
     ['전세 중간값', (s) => money(s.jeonse)],
@@ -1628,6 +1638,11 @@ function buildReportData() {
   const dayOf = (s) => Math.round((Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) - first) / 864e5);
   const kOf = (t) => 'LMH'[FLOOR_BANDS.indexOf(bandOf(t))];
   const nw = rows.filter((t) => t.gbn === '신규'), rn = rows.filter((t) => t.gbn === '갱신');
+  // PDF '가공 방법': 매매는 해제·직거래를 데이터 단계에서 뺐고, 이 면적에서 뺀 건수를 함께 적는다
+  const ex = tab === 'sale' ? exclCounts('sale') : null;
+  const procTxt = tab === 'sale'
+    ? `원본 거래 건을 그대로 사용하되 해제된 거래와 직거래(중개 없이 신고된 거래)는 통계에서 뺐습니다. 이 면적에서 직거래 ${ex.direct}건, 해제 ${ex.canceled}건은 통계에서 뺐습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.`
+    : '원본 거래 건을 그대로 사용했습니다(매매는 해제된 거래와 직거래를 통계에서 뺐고, 전월세 자료에는 해제·직거래 구분이 없습니다). 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.';
   const D = {
     type: KN, complex: state.apt, addr: `${regionLabel()} ${state.dong}`, built: state.built ? String(state.built) : '',
     period: `${state.from.slice(0, 4)}.${state.from.slice(4)} ~ ${state.to.slice(0, 4)}.${state.to.slice(4)}`,
@@ -1639,7 +1654,7 @@ function buildReportData() {
     src: '국토교통부 실거래가 공개시스템 (아파트 매매, 아파트 전월세)',
     cond: `계약일 ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · ${regionLabel()} · 단지명 ${state.apt} · 전용 ${pick}㎡`,
     basis: `${dtstr(I.at)} 수집 · 계약일 기준 · 이 단지의 가장 최근 계약일 ${latestIso || '—'}`,
-    proc: '원본 거래 건을 그대로 사용했고, 해제된 매매 거래만 통계에서 뺐습니다. 전월세 자료에는 해제 거래가 없습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.',
+    proc: procTxt,
     months: labels.map((m) => m.slice(2, 4) + '.' + m.slice(5)), starts, daysLast: starts.at(-1),
     dots: [], meds: [], hoga: null, ref: null, unsupported: false,
   };
@@ -1648,10 +1663,7 @@ function buildReportData() {
   FLOOR_BANDS.forEach((b, i) => {
     const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null, lo: null, hi: null };
     if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); } else f.med = med(v); }
-    if (tab === 'sale') {   // 층별 거래가격 구간(최저~최고): 1쪽 핵심 요약·화면 목록과 같이 직거래 제외. 중간값·건수(n)는 직거래 포함 그대로
-      const vx = v.filter((t) => t.gbn !== '직거래');
-      if (vx.length) { f.lo = d3.min(vx, (t) => t.price); f.hi = d3.max(vx, (t) => t.price); }
-    }
+    if (tab === 'sale' && v.length) { f.lo = d3.min(v, (t) => t.price); f.hi = d3.max(v, (t) => t.price); }   // 층별 거래가격 구간(최저~최고)
     D.floors['LMH'[i]] = f;
   });
   // 요약 수치
@@ -1668,10 +1680,10 @@ function buildReportData() {
   } else {
     D.kpi = { n: rows.length, newN: nw.length, renewN: rn.length, depRange: `${won(d3.min(rows, (t) => t.price))} ~ ${won(d3.max(rows, (t) => t.price))}`, allDep: med(rows), allRent: d3.median(rows, (t) => t.rent) };
   }
-  // 1쪽 핵심 요약의 최저·최고: 화면 "그래프에 쓴 거래 목록"과 같은 기준(매매는 직거래 제외). 월세는 월세 금액 기준이고 그 거래의 보증금을 함께 담는다.
+  // 1쪽 핵심 요약의 최저·최고: 화면 "그래프에 쓴 거래 목록"과 같은 거래(매매는 직거래·해제가 이미 빠져 있다). 월세는 월세 금액 기준이고 그 거래의 보증금을 함께 담는다.
   // 같은 값이 여러 건이면 가장 최근 계약일을 쓰고 나머지 건수를 more로 남긴다.
   {
-    const base = tab === 'sale' ? rows.filter((t) => t.gbn !== '직거래') : rows, val = tab === 'wolse' ? (t) => t.rent : (t) => t.price;
+    const base = rows, val = tab === 'wolse' ? (t) => t.rent : (t) => t.price;
     const at = (v) => { const m = base.filter((t) => val(t) === v).sort((a, b) => (a.date < b.date ? 1 : -1)); return { v, date: m[0].date.replaceAll('-', '.'), more: m.length - 1, dep: tab === 'wolse' ? m[0].price : null }; };
     D.kpi.lo = base.length ? at(d3.min(base, val)) : null;
     D.kpi.hi = base.length ? at(d3.max(base, val)) : null;
@@ -1704,9 +1716,8 @@ function buildReportData() {
   // 현재 호가와 실거래 비교 (askCard와 같은 기준) — 호가를 입력했으면 hoga, 아니면 최근 6개월 실거래 기준(ref)
   const A = { price: '', rent: '', floor: '', src: '', date: '', ...state.ask[tab] }, wolse = tab === 'wolse', PN = tab === 'sale' ? '거래가' : '보증금';
   const cutM = mlist.length > 6 ? mlist[mlist.length - 6] : mlist[0], rec6 = rows.filter((t) => t.ym >= cutM), recOk = rec6.length >= LOW, use = recOk ? rec6 : rows;
-  const rg = tab === 'sale' ? use.filter((t) => t.gbn !== '직거래') : use;   // 매매 실거래 범위는 직거래 제외(화면 호가 비교와 같게)
-  const mdn = med(use), lo = d3.min(rg, (t) => t.price), hi = d3.max(rg, (t) => t.price), rm = wolse ? d3.median(use, (t) => t.rent) : null;
-  const rgTxt = rg.length ? `${won(lo)} ~ ${won(hi)}${tab === 'sale' ? ' (직거래 제외)' : ''}` : '—';
+  const mdn = med(use), lo = d3.min(use, (t) => t.price), hi = d3.max(use, (t) => t.price), rm = wolse ? d3.median(use, (t) => t.rent) : null;
+  const rgTxt = `${won(lo)} ~ ${won(hi)}`;
   const basis = `같은 단지 · 전용 ${pick}㎡ · ${recOk ? `최근 6개월(${cutM.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec6.length}건뿐)`} ${KN} 거래 ${use.length}건`;
   const price = parseFloat(A.price), rent = parseFloat(A.rent), floor = parseInt(A.floor, 10), sgn = (v) => (v >= 0 ? '+' : '−');
   if (!(price > 0)) {
@@ -2127,6 +2138,14 @@ $('map-sgo').onclick = searchMap;
 $('map-go').onclick = showMap;
 
 /* ---------- 근거 ---------- */
+// 근거 카드 '가공 방법' 문장. 매매 탭이면 이 면적에서 뺀 직거래·해제 건수를 함께 적는다.
+function infoProc() {
+  if (state.tab === 'sale') {
+    const ex = exclCounts('sale');
+    return `원본 거래 건을 그대로 사용하되 해제된 거래와 직거래(중개 없이 신고된 거래)는 통계에서 뺐습니다. 이 면적에서 직거래 ${ex.direct}건, 해제 ${ex.canceled}건은 통계에서 뺐습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.`;
+  }
+  return '원본 거래 건을 그대로 사용했습니다(매매는 해제된 거래와 직거래를 통계에서 뺐고, 전월세 자료에는 해제·직거래 구분이 없습니다). 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.';
+}
 function infoRender() {
   const I = state.loadInfo;
   if (!I) return;
@@ -2135,7 +2154,7 @@ function infoRender() {
       ['출처', '국토교통부 실거래가 공개시스템 (아파트 매매, 아파트 전월세)'],
       ['조회 조건', `계약일 ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · ${regionLabel()}`],
       ['자료 기준', `${dtstr(I.at)} 수집 · 계약일 기준`],
-      ['가공 방법', '원본 거래 건을 그대로 쓰고 해제된 매매만 뺐습니다. 전용면적은 자료에 적힌 값 그대로 단지마다 고른 면적의 거래만 썼고, 모든 가격은 중간값입니다.'],
+      ['가공 방법', '원본 거래 건을 그대로 쓰고 해제된 매매와 직거래(중개 없이 신고된 거래)는 뺐습니다. 전용면적은 자료에 적힌 값 그대로 단지마다 고른 면적의 거래만 썼고, 모든 가격은 중간값입니다.'],
     ]), { id: 'info-kv' }));
     q('#info-list').replaceChildren(...[
       '비교는 위에서 조회한 지역·기간 안의 단지끼리만 할 수 있습니다. 다른 지역 단지는 지역을 바꿔 다시 조회해 주세요.',
@@ -2163,7 +2182,7 @@ function infoRender() {
     ['출처', '국토교통부 실거래가 공개시스템 (아파트 매매, 아파트 전월세)'],
     ['조회 조건', `계약일 ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · ${regionLabel()} · 단지명 ${state.apt} · 전용 ${state.pick}㎡`],
     ['자료 기준', `${dtstr(I.at)} 수집 · 계약일 기준 · 이 단지의 가장 최근 계약일 ${latest}`],
-    ['가공 방법', '원본 거래 건을 그대로 사용했고, 해제된 매매 거래만 통계에서 뺐습니다. 전월세 자료에는 해제 거래가 없습니다. 전세는 월세가 없는 계약, 월세는 월세가 있는 계약입니다.'],
+    ['가공 방법', infoProc()],
   ]), { id: 'info-kv' }));
   q('#info-list').replaceChildren(...[
     '평균이 아니라 중간값을 썼습니다. 한두 건의 특이한 거래에 숫자가 끌려가지 않게 하기 위해서입니다.',
