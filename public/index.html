@@ -1663,7 +1663,7 @@ function buildReportData() {
   D.floors = {};
   FLOOR_BANDS.forEach((b, i) => {
     const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null, lo: null, hi: null };
-    if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); f.dLo = d3.min(v, (t) => t.price); f.dHi = d3.max(v, (t) => t.price); f.rLo = d3.min(v, (t) => t.rent); f.rHi = d3.max(v, (t) => t.rent); } else f.med = med(v); }   // 월세 탭: 층별 보증금·월세 최저·최고(2쪽 범례)
+    if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); f.dLo = d3.min(v, (t) => t.price); f.dHi = d3.max(v, (t) => t.price); f.rLo = d3.min(v, (t) => t.rent); f.rHi = d3.max(v, (t) => t.rent); } else { f.med = med(v); if (tab === 'jeonse') { f.dLo = d3.min(v, (t) => t.price); f.dHi = d3.max(v, (t) => t.price); } } }   // 월세 탭: 층별 보증금·월세 최저·최고(2쪽 범례)
     if (tab === 'sale' && v.length) { f.lo = d3.min(v, (t) => t.price); f.hi = d3.max(v, (t) => t.price); }   // 층별 거래가격 구간(최저~최고)
     D.floors['LMH'[i]] = f;
   });

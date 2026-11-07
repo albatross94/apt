@@ -160,13 +160,8 @@ function chart(D){
   tk.forEach(function(t,i){var y=top+i*H/(n-1);if(i<n-1)g2+='<path d="M44 '+f1(y)+'H658"/>';yl2+='<text x="38" y="'+f1(y+(i===0?6:i===n-1?2:4))+'">'+t.toFixed(1)+'억</text>'});
   var stp=D.months.length>30?6:D.months.length>14?3:1;var xl2=D.months.map(function(m,i){return i%stp?'':'<text x="'+f1(xs(D.starts[i]))+'" y="212">'+m+'</text>'}).join('');
   var dots2=D.dots.map(function(p){return mark(p.k,p.r,xs(p.d),ys(p.p))}).join('');
-  // 월별 중간값 선·점은 전세 그래프에만 둔다(매매는 아래 층별 구간 막대와 월별 증감률 막대로 보여 준다)
-  var withMed=D.type!=='매매',runs=[],cur=[];
-  if(withMed)D.meds.forEach(function(m){if(cur.length&&m.mi!==cur[cur.length-1].mi+1){runs.push(cur);cur=[]}cur.push(m)});if(cur.length)runs.push(cur);
-  var pl=runs.filter(function(r){return r.length>1}).map(function(r){return '<polyline points="'+r.map(function(m){return f1(xs(m.d))+','+f1(ys(m.p))}).join(' ')+'" fill="none" stroke="#202227" stroke-width="2"/>'}).join('');
-  var mc=withMed?D.meds.map(function(m){return '<circle cx="'+f1(xs(m.d))+'" cy="'+f1(ys(m.p))+'" r="4"/>'}).join(''):'';
-  return svgWrap(D,'전용 '+D.sel.a+'㎡ '+D.type+' '+D.kpi.n+'건의 계약일별 거래 금액 산점도'+(withMed?'와 월별 중간값':''),
-    '<g stroke="#cbc8c1" stroke-width="1">'+g2+'</g><path d="M44 190H658" stroke="#423f3d" stroke-width="1"/><g font-size="12" fill="#423f3d" text-anchor="end">'+yl2+'</g><g font-size="12" fill="#423f3d" text-anchor="middle">'+xl2+'</g>'+dots2+pl+'<g fill="#ffffff" stroke="#202227" stroke-width="2">'+mc+'</g>');
+  return svgWrap(D,'전용 '+D.sel.a+'㎡ '+D.type+' '+D.kpi.n+'건의 계약일별 거래 금액 산점도',
+    '<g stroke="#cbc8c1" stroke-width="1">'+g2+'</g><path d="M44 190H658" stroke="#423f3d" stroke-width="1"/><g font-size="12" fill="#423f3d" text-anchor="end">'+yl2+'</g><g font-size="12" fill="#423f3d" text-anchor="middle">'+xl2+'</g>'+dots2);
 }
 
 function ymKo(p){var m=/(\d{4})\.(\d{2}) ~ (\d{4})\.(\d{2})/.exec(p);return m?m[1]+'년 '+(+m[2])+'월 ~ '+m[3]+'년 '+(+m[4])+'월':p}
@@ -289,17 +284,19 @@ function page2(D,N,evi){
       // 월세: 층별 보증금·월세 범위(1건이면 그 값 하나, 0건이면 거래 없음)
       var wr=!f.n?' · 거래 없음':f.dLo==null?'':' · 보증금 '+rngTxt(f.dLo,f.dHi)+' · 월세 '+rngTxt(f.rLo,f.rHi);
       return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b>'+(f.n?' '+f.n+'건':'')+wr+'</span></div>'}
-    if(f.n&&f.med&&T!=='매매')med=' · 중간값 '+fmt(f.med);
+    if(T==='전세'){
+      // 전세: 층별 보증금 범위(1건이면 그 값 하나, 0건이면 거래 없음)
+      var jr=!f.n?' · 거래 없음':f.dLo==null?'':' · 보증금 '+rngTxt(f.dLo,f.dHi);
+      return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b>'+(f.n?' '+f.n+'건':'')+jr+'</span></div>'}
     return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b> '+esc(f.rng||'')+' · '+f.n+'건'+med+'</span></div>'};
   var legs=leg('L','저층',D.floors.L)+leg('M','중층',D.floors.M)+leg('H','고층',D.floors.H);
-  if(T==='전세')legs+='<div style="display:flex;align-items:center;gap:8px">'+SV.V+'<span><b>월별 중간값</b> 한 달 3건 이상일 때만 표시</span></div>';
   var rn=D.legRenew!=null?D.legRenew:k.renewN,nw=D.legNew!=null?D.legNew:k.newN;
   var kind=T==='매매'?'':'<div style="display:flex;gap:16px;font-size:13px;line-height:20px"><span style="display:flex;align-items:center;gap:6px">'+SV.F+'<b>신규</b> '+nw+'건</span><span style="display:flex;align-items:center;gap:6px">'+SV.R+'<b>갱신(속이 빈 점)</b> '+rn+'건</span></div>';
   var sub=T==='매매'?'전용 '+D.sel.a+'㎡ · '+k.n+'건 · 점 하나가 거래 한 건입니다 (계약일 · 금액)':T==='전세'?'전용 '+D.sel.a+'㎡ · '+k.n+'건 · 점 하나가 거래 한 건입니다 (계약일 · 보증금)':'전용 '+D.sel.a+'㎡ · '+k.n+'건 · 점 하나가 거래 한 건입니다 (가로 보증금 · 세로 월세)';
   var cap;
   if(T==='월세')cap='';
   else{var minT=D.ticks[D.ticks.length-1];
-    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.lo&&k.hi?' · 최저 '+fmt(k.lo.v)+(T==='매매'?'':' · 중간값 '+fmt(k.med))+' · 최고 '+fmt(k.hi.v):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
+    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.lo&&k.hi?' · 최저 '+fmt(k.lo.v)+' · 최고 '+fmt(k.hi.v):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
   var warn=T==='월세'?'<div style="background:#e6d9ce;padding:8px 12px;font-size:13px;line-height:20px;font-weight:700">'+esc(D.warn)+'</div>':'';
   var lower;
   if(T==='월세'){
