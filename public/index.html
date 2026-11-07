@@ -1646,8 +1646,12 @@ function buildReportData() {
   // 층 구간별 건수·중간값
   D.floors = {};
   FLOOR_BANDS.forEach((b, i) => {
-    const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null };
+    const v = rows.filter((t) => bandOf(t) === b), f = { rng: b[1], n: v.length, med: null, dep: null, rent: null, lo: null, hi: null };
     if (v.length) { if (tab === 'wolse') { f.dep = med(v); f.rent = d3.median(v, (t) => t.rent); } else f.med = med(v); }
+    if (tab === 'sale') {   // 층별 거래가격 구간(최저~최고): 1쪽 핵심 요약·화면 목록과 같이 직거래 제외. 중간값·건수(n)는 직거래 포함 그대로
+      const vx = v.filter((t) => t.gbn !== '직거래');
+      if (vx.length) { f.lo = d3.min(vx, (t) => t.price); f.hi = d3.max(vx, (t) => t.price); }
+    }
     D.floors['LMH'[i]] = f;
   });
   // 요약 수치
