@@ -39,16 +39,16 @@ function readLines(D){
   if(D.type==='매매'){
     var r=k.recent;
     if(r){var pc=(r.med-k.med)/k.med*100,ap=Math.abs(pc).toFixed(1);
-      if(Math.abs(pc)<1)l2='<b>최근 가격은 1년 평균 수준입니다.</b> 최근 3개월 중간값이 1년 중간값과 거의 같습니다(차이 '+ap+'%).';
-      else{var up=pc>0;l2='<b>최근 가격이 더 '+(up?'높':'낮')+'습니다.</b> 최근 3개월 중간값이 1년 중간값보다 약 '+ap+'% '+(up?'높':'낮')+(r.n<10?'지만, 최근 3개월은 '+r.n+'건뿐입니다.':'습니다('+r.n+'건 기준).')}}
-    else l2='<b>최근 3개월 거래가 없습니다.</b> 최근 가격 흐름은 아래 그래프에서 확인해 주세요.';
+      if(Math.abs(pc)<1)l2='<b>최근 가격은 1년 평균 수준입니다.</b> 최근 3개월 중간값('+fmt(r.med)+')이 1년 중간값('+fmt(k.med)+')과 거의 같습니다(차이 '+ap+'%).';
+      else{var up=pc>0;l2='<b>최근 가격이 더 '+(up?'높':'낮')+'습니다.</b> 최근 3개월 중간값('+fmt(r.med)+')이 1년 중간값('+fmt(k.med)+')보다 약 '+ap+'% '+(up?'높':'낮')+(r.n<10?'지만, 최근 3개월은 '+r.n+'건뿐입니다.':'습니다('+r.n+'건 기준).')}}
+    else l2='<b>최근 3개월 거래가 없습니다.</b> 1년 중간값은 '+fmt(k.med)+'입니다. 최근 가격 흐름은 아래 그래프에서 확인해 주세요.';
     var meds=FL.map(function(z){return D.floors[z[0]]}).filter(function(f){return f.n>0&&f.med});
     var spread=meds.length>1?(Math.max.apply(null,meds.map(function(f){return f.med}))-Math.min.apply(null,meds.map(function(f){return f.med})))/k.med*100:0;
     var lead=meds.length<2?'층별 비교는 어렵습니다.':spread<3?'층별 차이는 크지 않습니다.':spread<8?'층별로 약간 차이가 있습니다.':'층별 차이가 뚜렷합니다.';
     l3='<b>'+lead+'</b> '+floorParts(D).join(' · ')+'.';
   }else if(D.type==='전세'){
     var rm=/^([\d.]+)%\s*(.*)$/.exec(k.ratioRaw||'');
-    l2=rm?'<b>전세가율은 '+rm[1]+'%입니다.</b> 매매 중간값 대비 전세 중간값의 비율이며, 대출 등 권리관계는 반영되지 않았습니다.':'<b>전세가율 자료가 없습니다.</b> 같은 기간 매매 거래가 없어 비교하지 못했습니다.';
+    l2=rm?'<b>전세가율은 '+rm[1]+'%입니다.</b> 매매 중간값 대비 전세 중간값의 비율입니다('+rm[2]+'). 대출 등 권리관계는 반영되지 않았습니다.':null;   // 같은 기간 매매 거래가 없어 계산할 수 없으면 이 줄을 뺀다
     var big=k.newN>=k.renewN*2;
     l3='<b>'+(big?'신규 계약이 대부분입니다.':'신규와 갱신이 비슷합니다.')+'</b> 신규 '+k.newN+'건 · 갱신 '+k.renewN+'건'+(k.renewMed==null?'(표본 부족)':'')+'. 층별 중간값은 '+floorParts(D).join(' · ')+'.';
   }else{
@@ -56,27 +56,22 @@ function readLines(D){
     l2=t.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+t[0].lab+' '+t[0].med+', '+t[t.length-1].lab+' '+t[t.length-1].med+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.';
     l3='<b>신규 '+k.newN+'건 · 갱신 '+k.renewN+'건입니다.</b> 층별 월세 중간값은 '+floorParts(D).join(' · ')+'.';
   }
-  return [l1,l2,l3];
+  return [l1,l2,l3].filter(Boolean);
 }
 
-function wcell(l,v,sz,sub){return '<div style="background:#fff;padding:12px 16px;display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:'+sz+'px;line-height:32px;font-weight:800">'+esc(v)+'</span>'+(sub?'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(sub)+'</span>':'')+'</div>'}
-function ycard(l,big,bigSz,sub,bottom){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:700">'+esc(l)+'</span><span style="font-size:'+bigSz+'px;line-height:48px;font-weight:900">'+esc(big)+'</span>'+(sub?'<span style="font-size:13px;line-height:20px;font-weight:500">'+esc(sub)+'</span>':'')+'</div><span style="font-size:13px;line-height:20px;font-weight:700">'+esc(bottom)+'</span>'}
-
+/* 핵심 요약: 가로 3칸(같은 크기). 거래 건수 / 가장 낮은 값 / 가장 높은 값.
+   최저·최고는 화면 '그래프에 쓴 거래 목록'과 같은 기준(매매는 직거래 제외, 월세는 월세 금액 기준)이고 D.kpi.lo/hi에 담겨 온다.
+   큰 금액이 칸을 넘치지 않도록 세 칸의 글자 크기는 가장 긴 값에 맞춰 같게 줄인다. */
 function summary(D){
-  var k=D.kpi,T=D.type,yel,cells;
-  if(T==='매매'){var r=k.recent;
-    if(r){var df=r.med-k.med;yel=ycard('최근 3개월 중간값',fmt(r.med),40,r.n+'건 · '+r.from+' ~ '+r.to,'1년 중간값('+fmt(k.med)+')'+(df===0?'과 같음':'보다 '+fmt(Math.abs(df))+' '+(df>0?'높음':'낮음')))}
-    else yel=ycard('1년 중간값',fmt(k.med),40,'','최근 3개월 거래 없음');
-    cells=[wcell('거래 건수',k.n+'건',24,'해제 거래 제외'),wcell('중간값',fmt(k.med),20,'가장 가운데 거래'),wcell('가장 낮은 거래',fmt(k.min),20),wcell('가장 높은 거래',fmt(k.max),fmt(k.max).length>9?18:20)];
-  }else if(T==='전세'){var rm=/^([\d.]+)%\s*(.*)$/.exec(k.ratioRaw||'');
-    if(rm){var pr=rm[2].split(' · ');yel=ycard('매매 대비 전세가율',rm[1]+'%',40,pr[0],pr.length>1?pr.slice(1).join(' · '):'대출 등 권리관계는 반영되지 않은 수치')}
-    else yel=ycard('전세 중간값',fmt(k.med),40,'','전세가율은 같은 기간 매매 거래가 있어야 계산됩니다');
-    cells=[wcell('전세 거래 건수',k.n+'건',24,D.period.replace(/ /g,'')),wcell('전세 중간값',fmt(k.med),20,'신규·갱신 모두'),wcell('신규 계약 중간값',k.newMed!=null?fmt(k.newMed):'표본 부족',20,k.newN+'건'),wcell('갱신 계약 중간값',k.renewMed!=null?fmt(k.renewMed):'표본 부족',20,k.renewN+'건')];
-  }else{
-    yel=ycard('보증금 범위',k.depRange,28,'가장 낮은 ~ 가장 높은 보증금',k.allDep!=null?'중간값 보증금 '+fmt(k.allDep)+' · 월세 '+fmt(k.allRent):'');
-    cells=[wcell('월세 거래 건수',k.n+'건',24,D.period.replace(/ /g,'')),wcell('신규 계약',k.newN+'건',24),wcell('갱신 계약',k.renewN+'건',24),wcell('월세 중간값',k.allRent!=null?fmt(k.allRent):'—',20,k.allDep!=null?'보증금 '+fmt(k.allDep):'')];
-  }
-  return '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px"><div style="background:#dfc10e;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:8px">'+yel+'</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">'+cells.join('')+'</div></div>';
+  var k=D.kpi,T=D.type,W=T==='월세',P=T==='매매'?'거래':W?'월세':'보증금';
+  var ext=function(x){return x?fmt(x.v):'—'};
+  var when=function(x){if(!x)return '거래 없음';
+    return '계약일 '+x.date+(x.more>0?' 외 '+x.more+'건':'')+(W&&x.dep!=null?' · 보증금 '+fmt(x.dep):'')};
+  var cnt=T==='매매'?'해제 거래 제외':D.period.replace(/ /g,'');
+  var vals=[ext(k.lo),ext(k.hi)],len=Math.max(vals[0].length,vals[1].length),sz=len<=7?32:len<=10?28:len<=12?25:22;
+  var cell=function(l,v,s,sub){return '<div style="background:#fff;padding:14px 16px;display:flex;flex-direction:column;min-width:0"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:'+s+'px;line-height:44px;font-weight:800;white-space:nowrap">'+esc(v)+'</span><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(sub)+'</span></div>'};
+  var cells=[cell('거래 건수',k.n+'건',sz,cnt),cell('가장 낮은 '+(T==='매매'?'거래':P),vals[0],sz,when(k.lo)),cell('가장 높은 '+(T==='매매'?'거래':P),vals[1],sz,when(k.hi))];
+  return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:16px;align-items:stretch">'+cells.join('')+'</div>';
 }
 
 // 단지 개요 한 줄(총 세대수·동 수·주차대수). 단지 상세 자료를 못 불러왔으면 넣지 않는다
