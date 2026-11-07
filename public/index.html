@@ -1094,14 +1094,14 @@ function monthlyCard(body, rows) {
   rows = inBand(rows);   // 위 그래프(층 구간·계약구분 선택)와 같은 거래만 쓴다
   const rent = state.tab === 'wolse', KN = KNAME[state.tab];
   const vf = rent ? (v) => d3.median(v, (t) => t.rent) : med, won1 = rent ? (v) => `${fmtRent(v)}만원` : won;
-  const k = card(`월별 ${KN} 중간값과 증감률`, `전용 ${state.pick}㎡ · 위 그래프와 같은 거래 · 한 달 ${LOW}건 이상인 달만 ${rent ? '월세 ' : ''}중간값을 내고, 증감률은 바로 앞의 중간값이 있는 달과 비교합니다(앞 달이 표본 부족이면 "N개월 전 대비"로 표시, 비교 간격이 ${GAP_FAR}개월 이상이면 증감률 대신 "간격 큼"). 상승은 붉은색 ▲, 하락은 파란색 ▼입니다.`);
+  const k = card(`월별 ${KN} 중간값과 증감률`, `전용 ${state.pick}㎡ · 위 그래프와 같은 거래 · 한 달 ${LOW}건 이상인 달만 ${rent ? '월세 ' : ''}중간값을 내고, 증감률은 바로 앞의 중간값이 있는 달과 비교합니다(앞 달이 표본 부족이면 "N개월 전 대비"로 표시, 비교 간격이 ${GAP_FAR}개월 이상이면 증감률 대신 "간격 큼", 중간값을 낸 달이 3개월 미만이면 "기간 전체 변화"는 "표본 적음"). 상승은 붉은색 ▲, 하락은 파란색 ▼입니다.`);
   body.append(k);
   const L = monthlyChange(rows, monthsInRange(), vf), ok = L.filter((o) => o.med != null);
   if (ok.length < 2) { k.append(mk('div', `한 달 ${LOW}건 이상인 달이 ${ok.length}개뿐이라 증감률을 낼 수 없습니다. 조회 기간을 늘리거나 층 구간 선택을 풀어 보세요.`, 'gx-empty')); return; }
-  const a = ok[0], b = ok.at(-1), tot = (b.med - a.med) / a.med * 100;
+  const a = ok[0], b = ok.at(-1), tot = (b.med - a.med) / a.med * 100, few = ok.length < 3;   // 중간값을 낸 달이 3개월 미만이면 전체 변화는 퍼센트를 내지 않는다
   const colored = (el, p) => { const v = el.querySelector('.v'); const c = pctCls(p); if (c) v.classList.add(c); return el; };
   k.append(statsRow(
-    colored(stat('기간 전체 변화', pctTxt(tot), `${ymDot(a.mo)} ${won1(a.med)} → ${ymDot(b.mo)} ${won1(b.med)}`), tot),
+    colored(stat('기간 전체 변화', few ? '표본 적음' : pctTxt(tot), `${ymDot(a.mo)} ${won1(a.med)} → ${ymDot(b.mo)} ${won1(b.med)}`), few ? 0 : tot),
     colored(stat('가장 최근 증감', b.gap >= GAP_FAR ? '간격 큼' : pctTxt(b.pct), `${ymDot(b.mo)} · ${b.gap > 1 ? b.gap + '개월 전 대비' : '전월 대비'} ${b.diff >= 0 ? '+' : '−'}${won1(Math.abs(b.diff))}`), b.gap >= GAP_FAR ? 0 : b.pct),
     stat('중간값을 낸 달', `${ok.length}개월`, `조회 ${L.length}개월 중 · ${LOW}건 미만인 달은 제외`)));
   if (rent) k.append(mk('div', '월세는 보증금이 클수록 낮아지므로, 달마다 거래된 보증금이 다르면 월세 증감이 시세 변화가 아니라 보증금 구성 차이일 수 있습니다. 아래 표의 보증금 중간값을 함께 보고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
