@@ -165,7 +165,7 @@ var SV={
 
 var SVGF='font-family:\'Noto Sans KR\',\'Malgun Gothic\',\'Apple SD Gothic Neo\',sans-serif';
 function svgBox(w,h,label,inner){return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" role="img" aria-label="'+esc(label)+'" style="display:block;'+SVGF+'">'+inner+'</svg>'}
-function svgT(x,y,txt,o){o=o||{};return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-size="'+(o.sz||12)+'"'+(o.b?' font-weight="700"':'')+' fill="'+(o.fill||'#423f3d')+'"'+(o.anchor?' text-anchor="'+o.anchor+'"':'')+'>'+esc(txt)+'</text>'}
+function svgT(x,y,txt,o){o=o||{};return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-size="'+(o.sz||12)+'"'+(o.b?' font-weight="700"':'')+' fill="'+(o.fill||'#423f3d')+'"'+(o.anchor?' text-anchor="'+o.anchor+'"':'')+(o.halo?' stroke="#fff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"':'')+'>'+esc(txt)+'</text>'}
 
 /* 층별 거래가격 구간(매매 2쪽): 층마다 최저~최고 가로 막대와 건수. 직거래·해제는 이미 자료에서 빠져 있다(D.floors.*.lo/hi).
    3건 미만인 층은 막대 대신 '표본 적음'. 색은 점 그래프의 층 색(저층 회색·중층 빨강·고층 노랑)과 같다. */
@@ -173,7 +173,7 @@ function floorBars(D){
   var COL={L:'#423f3d',M:'#ae353d',H:'#dfc10e'};
   var rows=FL.map(function(z){var f=D.floors[z[0]];return {k:z[0],name:z[1],f:f,ok:f.n>=3&&f.lo!=null}});
   var okR=rows.filter(function(r){return r.ok});
-  var W=666,BX0=124,BX1=448,RH=40,top=6,H=top+RH*3+24,x,ticks=[],t0=0,t1=1,s='';
+  var W=666,BX0=124,BX1=448,RH=36,top=6,H=top+RH*3+24,x,ticks=[],t0=0,t1=1,s='';
   if(okR.length){
     var lo=Infinity,hi=-Infinity;
     okR.forEach(function(r){lo=Math.min(lo,r.f.lo/1e4);hi=Math.max(hi,r.f.hi/1e4)});
@@ -186,7 +186,7 @@ function floorBars(D){
   }
   rows.forEach(function(r,i){
     var cy=top+RH*i+RH/2,f=r.f;
-    s+=mark(r.k,0,9,cy-7)+svgT(20,cy-3,r.name,{sz:14,b:1,fill:'#202227'})+svgT(20,cy+15,f.rng||'',{sz:11});   // 층 구간(몇 층~몇 층)은 작은 글씨
+    s+=mark(r.k,0,9,cy-7)+svgT(20,cy-1.5,r.name,{sz:14,b:1,fill:'#202227'})+svgT(20,cy+14.5,f.rng||'',{sz:10});   // 층 구간(몇 층~몇 층)은 작은 글씨
     if(r.ok){
       var x1=x(f.lo/1e4),x2=x(f.hi/1e4);
       s+='<rect x="'+x1.toFixed(1)+'" y="'+(cy-8)+'" width="'+Math.max(x2-x1,4).toFixed(1)+'" height="16" fill="'+COL[r.k]+'"'+(r.k==='L'?' fill-opacity="0.6"':'')+(r.k==='H'?' stroke="#202227" stroke-width="1"':'')+'/>'+
@@ -210,29 +210,61 @@ function chgMap(D){
     prev=m});
   return byM;
 }
+/* 월별 중간값과 증감률(매매·전세 2쪽): 위 = 월별 중간값 꺾은선+점, 아래 = 전월 대비 증감률 막대. 월 축(가로)을 공유한다.
+   값은 D.meds(한 달 3건 이상인 달만): 3건 미만인 달은 점이 없고 선도 끊는다. 막대는 chgMap(앱 monthlyChange와 같은 규칙).
+   중간값 세로축은 0이 아니라 값 범위에 맞추고 시작값을 작은 글씨로 알린다. */
 function monthBars(D,c0,cols){
-  var byM=chgMap(D),n=cols-c0,W=666,H=218,ML=34,pT=22,pB=158,labY=193,gapY=209,i,any=false,pos=0,neg=0;
-  for(i=c0;i<cols;i++){var c=byM[i];if(c){any=true;if(c.gap<4){pos=Math.max(pos,c.pc);neg=Math.max(neg,-c.pc)}}}
-  var title='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+h2('월별 증감률')+'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">3건 이상인 달끼리 비교'+(cols-c0<cols?' · 최근 12개월만 표시':'')+'</span></div>';
-  if(!any)return '<div style="background:#fff;padding:12px 24px;display:flex;flex-direction:column;gap:8px">'+title+'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">한 달에 3건 이상인 달이 둘 이상 없어 증감률을 계산하지 않았습니다.</span></div>';
-  var total=Math.max(pos+neg,1),unit=(pB-pT)/total,y0=pT+pos*unit,cw=(W-ML)/n,bw=Math.min(30,cw*0.56),s='';
+  var byM=chgMap(D),n=cols-c0,W=666,H=236,ML=44,i,any=false,pos=0,neg=0;
+  var aT=24,aB=92,pT=114,pB=180,labY=215,gapY=231;   // 위 패널(꺾은선) 24~92, 아래 패널(막대) 114~180
+  var medBy={};D.meds.forEach(function(m){medBy[m.mi]=m});
+  var vals=[];
+  for(i=c0;i<cols;i++){var c=byM[i];if(c){any=true;if(c.gap<4){pos=Math.max(pos,c.pc);neg=Math.max(neg,-c.pc)}}if(medBy[i])vals.push(medBy[i].p)}
+  var title=function(extra){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+h2('월별 중간값과 증감률')+'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">3건 이상인 달끼리'+(cols-c0<cols?' · 최근 12개월':'')+(extra||'')+'</span></div>'};
+  if(!any||vals.length<2)return '<div style="background:#fff;padding:12px 24px;display:flex;flex-direction:column;gap:8px">'+title()+'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">한 달에 3건 이상인 달이 둘 이상 없어 중간값 추이와 증감률을 그리지 않았습니다.</span></div>';
+  // 중간값 세로축: 값 범위에 맞춘 눈금(억 원)
+  var vmin=Math.min.apply(null,vals),vmax=Math.max.apply(null,vals),span=vmax-vmin;
+  var step=[0.1,0.2,0.5,1,2,5,10].filter(function(v){return span/v<=3})[0]||10;
+  var lo=Math.floor(vmin/step+1e-9)*step,hi=Math.ceil(vmax/step-1e-9)*step;if(hi<=lo)hi=lo+step;
+  var yv=function(v){return aB-(v-lo)/(hi-lo)*(aB-aT)};
+  var cw=(W-ML)/n,bw=Math.min(30,cw*0.56),cx=function(j){return ML+(j+0.5)*cw},s='';
+  // 위 패널: 눈금선·눈금 라벨
+  for(var q=0,nq=Math.round((hi-lo)/step);q<=nq;q++){var tv=lo+q*step;
+    s+='<path d="M'+ML+' '+yv(tv).toFixed(1)+'H'+W+'" stroke="#cbc8c1" stroke-width="1"/>'+svgT(ML-6,yv(tv)+4,tv.toFixed(1)+'억',{sz:11,anchor:'end'})}
+  // 꺾은선: 이어진 달끼리만 잇고(3건 미만인 달에서 끊음), 점마다 위에 중간값
+  var runs=[],cur=[],lab=[];
+  for(i=c0;i<cols;i++){var m=medBy[i];
+    if(m){cur.push({j:i-c0,x:cx(i-c0),y:yv(m.p),p:m.p})}
+    else if(cur.length){runs.push(cur);cur=[]}}
+  if(cur.length)runs.push(cur);
+  runs.forEach(function(r){if(r.length>1)s+='<polyline points="'+r.map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1)}).join(' ')+'" fill="none" stroke="#202227" stroke-width="2.2" stroke-linejoin="round"/>'});
+  var all=[].concat.apply([],runs),r2=function(v){return (Math.round(v*100+1e-7)/100).toFixed(2)};
+  all.forEach(function(p,k){
+    s+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#fff" stroke="#202227" stroke-width="2"/>';
+    var txt=r2(p.p)+'억',ly=p.y-8,prev=lab[lab.length-1];
+    // 이웃 라벨과 가로로 겹치면 아래쪽에 표시해 간격을 둔다
+    if(prev&&Math.abs(p.x-prev.x)<txt.length*5.6+4&&prev.above)ly=p.y+16;
+    lab.push({x:p.x,above:ly<p.y});
+    s+=svgT(p.x,ly,txt,{sz:10,anchor:'middle',fill:'#202227',halo:1,b:1});
+  });
+  // 아래 패널: 증감률 막대
+  var total=Math.max(pos+neg,1),unit=(pB-pT)/total,y0=pT+pos*unit;
   s+='<path d="M'+ML+' '+y0.toFixed(1)+'H'+W+'" stroke="#423f3d" stroke-width="1"/>'+svgT(ML-6,y0+4,'0%',{sz:11,anchor:'end'});
   for(i=c0;i<cols;i++){
-    var j=i-c0,cx=ML+(j+0.5)*cw,cc=byM[i];
-    s+=svgT(cx,labY,D.months[i],{sz:12,anchor:'middle'});
+    var j=i-c0,x=cx(j),cc=byM[i];
+    s+=svgT(x,labY,D.months[i],{sz:12,anchor:'middle'});
     if(!cc)continue;
-    if(cc.gap>=4){s+=svgT(cx,y0-6,'간격 큼',{sz:11,anchor:'middle',fill:'#6b6560'})}
+    if(cc.gap>=4){s+=svgT(x,y0-6,'간격 큼',{sz:11,anchor:'middle',fill:'#6b6560'})}
     else{
       var up=cc.pc>0,dn=cc.pc<0,col=up?'#c0392b':dn?'#1f5fa8':'#423f3d',h=Math.abs(cc.pc)*unit;
       if(cc.pc!==0)h=Math.max(h,1.5);
-      s+='<rect x="'+(cx-bw/2).toFixed(1)+'" y="'+(cc.pc>=0?y0-h:y0).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+col+'"/>'+
-        svgT(cx,cc.pc>=0?y0-h-4:y0+h+13,(up?'▲':dn?'▼':'')+Math.abs(cc.pc).toFixed(1)+'%',{sz:12,b:1,anchor:'middle',fill:col});
+      s+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+(cc.pc>=0?y0-h:y0).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+col+'"/>'+
+        svgT(x,cc.pc>=0?y0-h-4:y0+h+13,(up?'▲':dn?'▼':'')+Math.abs(cc.pc).toFixed(1)+'%',{sz:12,b:1,anchor:'middle',fill:col});
     }
-    if(cc.gap>1)s+=svgT(cx,gapY,cc.gap+'개월 전',{sz:10,anchor:'middle'});
+    if(cc.gap>1)s+=svgT(x,gapY,cc.gap+'개월 전',{sz:10,anchor:'middle'});
   }
-  return '<div style="background:#fff;padding:12px 24px 12px 24px;display:flex;flex-direction:column;gap:8px">'+title+
-    svgBox(W,H,'전용 '+D.sel.a+'㎡ 월별 증감률 막대그래프',s)+
-    '<span style="font-size:12px;line-height:18px;font-weight:500;color:#423f3d">붉은색 ▲ 상승 · 파란색 ▼ 하락 · 앞 달이 비면 \'N개월 전\' 대비 · 4개월 이상 떨어지면 막대 없이 \'간격 큼\'</span></div>';
+  return '<div style="background:#fff;padding:12px 24px 12px 24px;display:flex;flex-direction:column;gap:8px">'+title(' <span style="font-size:11px">· 중간값 세로축은 0이 아니라 '+lo.toFixed(1)+'억부터</span>')+
+    svgBox(W,H,'전용 '+D.sel.a+'㎡ 월별 중간값 꺾은선과 증감률 막대그래프',s)+
+    '<span style="font-size:12px;line-height:18px;font-weight:500;color:#423f3d">위: 월별 중간값 · 아래: 증감률(붉은 ▲ 상승, 파란 ▼ 하락) · 앞 달이 비면 \'N개월 전\' · 4개월 이상 떨어지면 \'간격 큼\'</span></div>';
 }
 
 function page2(D,N,evi){
@@ -267,10 +299,15 @@ function page2(D,N,evi){
 
 function refCard(D){
   var r=D.ref,kv=function(a,b){return '<span style="font-weight:700;color:#423f3d">'+a+'</span><span>'+esc(b)+'</span>'};
-  var rows=kv('비교 기준',r.basis)+(D.type==='월세'?kv('보증금 중간값',r.med)+kv('월세 중간값',r.rent||'—'):'')+kv('실거래 범위',r.range);   // 매매·전세는 실거래 중간값 줄을 두지 않는다(호가 비교 카드의 실거래 중간값은 그대로)
+  // 실거래 범위: 저층·중층·고층 세 줄로 나눠 최저~최고(n건). 층 구간은 2쪽 층별 막대와 같다. 0건은 '거래 없음', 1~2건은 그대로 두고 '표본 적음'.
+  // 월세는 지금 범위가 나타내는 값(보증금)을 그대로 층별로 나눈다.
+  var rangeRows=r.floors?kv('실거래 범위'+(D.type==='월세'?'(보증금)':''),'층 구간별 최저~최고(건수)')+FL.map(function(z){var f=r.floors[z[0]];
+    var v=!(f.n>0)?'거래 없음':rngTxt(f.lo,f.hi)+' ('+f.n+'건'+(f.n<3?' · 표본 적음':'')+')';
+    return kv('　'+z[1]+' '+(f.rng||''),v)}).join(''):kv('실거래 범위',r.range);
+  var rows=kv('비교 기준',r.basis)+(D.type==='월세'?kv('보증금 중간값',r.med)+kv('월세 중간값',r.rent||'—'):'')+rangeRows;   // 매매·전세는 실거래 중간값 줄을 두지 않는다(호가 비교 카드의 실거래 중간값은 그대로)
   return '<div style="background:#fff;padding:16px 24px;display:flex;flex-direction:column;gap:8px">'+h2('최근 6개월 실거래 기준 · '+D.type)+
   '<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">호가를 입력하지 않아 호가 비교는 넣지 않았습니다. 호가를 입력한 뒤 저장하면 이 쪽에 차액과 비율, 유사 거래 비교가 들어갑니다.</span>'+
-  '<div style="display:grid;grid-template-columns:110px minmax(0,1fr);column-gap:12px;row-gap:4px;font-size:14px;line-height:22px">'+rows+'</div></div>';
+  '<div style="display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:12px;row-gap:4px;font-size:14px;line-height:22px">'+rows+'</div></div>';
 }
 
 /* 호가 비교 (매매·전세·월세). h.head/h.rows: 유사 거래 표(문자열), h.rentLine: 월세 호가와 실거래 월세 중간값의 차이(월세만) */

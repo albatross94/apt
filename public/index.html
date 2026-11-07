@@ -1721,7 +1721,10 @@ function buildReportData() {
   const basis = `같은 단지 · 전용 ${pick}㎡ · ${recOk ? `최근 6개월(${cutM.replace('-', '.')}~)` : `조회 전체 기간(최근 6개월 ${rec6.length}건뿐)`} ${KN} 거래 ${use.length}건`;
   const price = parseFloat(A.price), rent = parseFloat(A.rent), floor = parseInt(A.floor, 10), sgn = (v) => (v >= 0 ? '+' : '−');
   if (!(price > 0)) {
-    D.ref = { basis, med: won(mdn), rent: wolse ? fmtRent(rm) + "만원" : "", range: rgTxt };
+    // 3쪽 "최근 6개월 실거래 기준"의 층별 최저~최고(n건): 비교에 쓴 거래(use)를 2쪽 층별 막대와 같은 층 구간으로 나눈다. 월세는 지금 범위와 같은 값(보증금).
+    const fr = {};
+    FLOOR_BANDS.forEach((b, i) => { const v = use.filter((t) => bandOf(t) === b); fr['LMH'[i]] = { rng: b[1], n: v.length, lo: v.length ? d3.min(v, (t) => t.price) : null, hi: v.length ? d3.max(v, (t) => t.price) : null }; });
+    D.ref = { basis, med: won(mdn), rent: wolse ? fmtRent(rm) + "만원" : "", range: rgTxt, floors: fr };
   } else {
     const diff = price - mdn, hasFloor = floor > 0;
     const sim = [...use].sort((x, y) => (hasFloor ? Math.abs(x.floor - floor) - Math.abs(y.floor - floor) : 0) || (x.date < y.date ? 1 : -1)).slice(0, 8);
