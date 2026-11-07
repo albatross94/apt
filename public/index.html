@@ -1090,6 +1090,55 @@ const ymDot = (mo) => mo.replace('-', '.');
 const pctTxt = (p) => (p == null ? '—' : `${p > 0 ? '▲ ' : p < 0 ? '▼ ' : ''}${Math.abs(p).toFixed(1)}%`);
 const pctCls = (p) => (p > 0 ? 'gx-up' : p < 0 ? 'gx-down' : '');
 const pctNode = (p) => mk('span', pctTxt(p), pctCls(p));
+// 월별 중간값(위, 꺾은선+점)과 증감률(아래, 막대)을 월 축을 공유하는 한 SVG에 그린다. 숫자는 monthlyChange 결과(L) 그대로.
+// 3건 미만인 달(med 없음)은 점·선·막대가 없고, 비교 간격이 GAP_FAR 이상인 달은 막대 대신 "간격 큼"만 적는다.
+function monthlyChart(k, L, { rent, won1, sgnWon }) {
+  const el = plotBox(k), n = L.length;
+  const W = Math.max(el.clientWidth, 280), m = { l: 52, r: 18 }, P1 = [22, 182], P2 = [226, 316], H = 350;
+  const months = L.map((o) => o.mo), xl = (mo) => mo.slice(2, 4) + '.' + mo.slice(5);
+  const x = d3.scaleBand().domain(months).range([m.l, W - m.r]).padding(0.25), cx = (mo) => x(mo) + x.bandwidth() / 2;
+  const meds = L.filter((o) => o.med != null);
+  const ext = d3.extent(meds, (o) => o.med), pad = (ext[1] - ext[0]) * 0.08 || (rent ? 5 : 1000);
+  const y1 = d3.scaleLinear().domain([Math.max(0, ext[0] - pad), ext[1] + pad]).nice().range([P1[1], P1[0]]);
+  const bars = L.filter((o) => o.pct != null && o.gap < GAP_FAR), far = L.filter((o) => o.pct != null && o.gap >= GAP_FAR);
+  const mx = Math.max(1, d3.max(bars, (o) => Math.abs(o.pct)) || 0);
+  const y2 = d3.scaleLinear().domain([-mx, mx]).nice().range([P2[1], P2[0]]);
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').style('overflow', 'visible')
+    .attr('aria-label', `월별 ${rent ? '월세 ' : ''}중간값 꺾은선과 증감률 막대 그래프`);
+  const cap = (t, yy) => svg.append('text').attr('x', m.l).attr('y', yy).text(t).style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
+  cap(rent ? '월세 중간값' : `${KNAME[state.tab]} 중간값`, 13); cap('직전 대비 증감률', P2[0] - 8);
+  svg.append('g').selectAll('line').data(y1.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y1(d)).attr('y2', (d) => y1(d)).style('stroke', 'var(--cds-chart-grid)');
+  axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y1).ticks(4).tickFormat(rent ? (d) => `${fmtRent(d)}만` : (d) => eok(d) + '억').tickSize(0)).call((g) => g.select('.domain').remove()));
+  axisStyle(svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y2).tickValues([y2.domain()[0], 0, y2.domain()[1]]).tickFormat((d) => `${d > 0 ? '+' : ''}${d}%`).tickSize(0)).call((g) => g.select('.domain').remove()));
+  svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y2(0)).attr('y2', y2(0)).style('stroke', 'var(--cds-chart-axis)');
+  // 월 라벨: 겹치지 않게 간격을 두고, 가장 최근 달이 항상 보이도록 끝에서부터 센다
+  const step = Math.max(1, Math.ceil(n / Math.max(1, Math.floor((W - m.l - m.r) / 40)))), shown = months.filter((_, i) => (n - 1 - i) % step === 0);
+  axisStyle(svg.append('g').attr('transform', `translate(0,${P2[1] + 6})`).call(d3.axisBottom(x).tickValues(shown).tickFormat(xl).tickSizeOuter(0)));
+  // 중간값 꺾은선: 이어진 달끼리만 잇고, 표본 적은 달에서 끊는다
+  const segs = []; let cur = [];
+  L.forEach((o) => { if (o.med == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(o); });
+  if (cur.length) segs.push(cur);
+  for (const sg of segs) if (sg.length > 1) svg.append('path').attr('d', d3.line().x((o) => cx(o.mo)).y((o) => y1(o.med))(sg)).attr('fill', 'none').attr('stroke-width', 2.5).attr('stroke-linejoin', 'round').style('stroke', 'var(--color-fg)');
+  svg.append('g').selectAll('circle').data(meds).join('circle').attr('cx', (o) => cx(o.mo)).attr('cy', (o) => y1(o.med)).attr('r', 4.5).style('fill', 'var(--color-bg)').style('stroke', 'var(--color-fg)').attr('stroke-width', 2);
+  const bw = Math.min(x.bandwidth(), 24);
+  svg.append('g').selectAll('rect').data(bars).join('rect').attr('x', (o) => cx(o.mo) - bw / 2).attr('width', bw)
+    .attr('y', (o) => (o.pct >= 0 ? y2(o.pct) : y2(0))).attr('height', (o) => Math.max(o.pct === 0 ? 2 : 0, Math.abs(y2(o.pct) - y2(0))))
+    .style('fill', (o) => (o.pct > 0 ? '#c0392b' : o.pct < 0 ? '#1f5fa8' : 'var(--color-fg-muted)'));
+  svg.append('g').selectAll('text').data(far).join('text').attr('x', (o) => Math.max(m.l + 16, Math.min(W - m.r - 16, cx(o.mo)))).attr('y', y2(0) - 5).attr('text-anchor', 'middle')
+    .text('간격 큼').style('font-size', '10px').style('fill', 'var(--color-fg-muted)');
+  // 툴팁: 점·막대가 있는 달의 세로 띠 어디를 가리키거나 눌러도 그 달 설명이 나온다
+  const ring = svg.append('circle').attr('r', 8).attr('fill', 'none').attr('stroke-width', 2).style('stroke', 'var(--color-fg)').style('display', 'none');
+  const show = (o) => {
+    ring.style('display', null).attr('cx', cx(o.mo)).attr('cy', y1(o.med));
+    tip(el, [ymLabel(o.mo.replace('-', '')),
+      `${o.n}건 · ${rent ? '월세 ' : ''}중간값 ${won1(o.med)}${rent && o.dep != null ? ` · 보증금 중간값 ${won(o.dep)}` : ''}`,
+      `직전 대비 ${sgnWon(o.diff)} · 증감률 ${o.pct == null ? '—' : o.gap >= GAP_FAR ? '간격 큼' : pctTxt(o.pct)}`,
+      `비교 기준 ${o.pct == null ? '—' : o.gap > 1 ? o.gap + '개월 전 대비' : '전월 대비'}`], cx(o.mo), y1(o.med));
+  };
+  svg.append('g').selectAll('rect').data(meds).join('rect').attr('x', (o) => cx(o.mo) - x.step() / 2).attr('y', P1[0]).attr('width', x.step()).attr('height', P2[1] - P1[0]).attr('fill', 'transparent')
+    .on('pointerenter', (ev, o) => show(o)).on('pointermove', (ev, o) => show(o)).on('pointerdown', (ev, o) => show(o)).on('pointerleave', () => { ring.style('display', 'none'); hideTip(el); });
+  k.append(mk('p', '위: 월별 중간값(한 달 3건 미만인 달은 점을 찍지 않고 선도 끊음). 아래: 직전 대비 증감률(붉은색 상승, 파란색 하락, 비교 간격이 길면 "간격 큼"). 점·막대에 올리면 자세한 숫자가 나옵니다.', 'gx-note'));
+}
 function monthlyCard(body, rows) {
   rows = inBand(rows);   // 위 그래프(층 구간·계약구분 선택)와 같은 거래만 쓴다
   const rent = state.tab === 'wolse', KN = KNAME[state.tab];
@@ -1104,8 +1153,9 @@ function monthlyCard(body, rows) {
     colored(stat('기간 전체 변화', few ? '표본 적음' : pctTxt(tot), `${ymDot(a.mo)} ${won1(a.med)} → ${ymDot(b.mo)} ${won1(b.med)}`), few ? 0 : tot),
     colored(stat('가장 최근 증감', b.gap >= GAP_FAR ? '간격 큼' : pctTxt(b.pct), `${ymDot(b.mo)} · ${b.gap > 1 ? b.gap + '개월 전 대비' : '전월 대비'} ${b.diff >= 0 ? '+' : '−'}${won1(Math.abs(b.diff))}`), b.gap >= GAP_FAR ? 0 : b.pct),
     stat('중간값을 낸 달', `${ok.length}개월`, `조회 ${L.length}개월 중 · ${LOW}건 미만인 달은 제외`)));
-  if (rent) k.append(mk('div', '월세는 보증금이 클수록 낮아지므로, 달마다 거래된 보증금이 다르면 월세 증감이 시세 변화가 아니라 보증금 구성 차이일 수 있습니다. 아래 표의 보증금 중간값을 함께 보고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
   const sgnWon = (d) => (d == null ? '—' : d === 0 ? (rent ? '0만원' : '0원') : `${d > 0 ? '+' : '−'}${won1(Math.abs(d))}`);
+  monthlyChart(k, L, { rent, won1, sgnWon });
+  if (rent) k.append(mk('div', '월세는 보증금이 클수록 낮아지므로, 달마다 거래된 보증금이 다르면 월세 증감이 시세 변화가 아니라 보증금 구성 차이일 수 있습니다. 아래 표의 보증금 중간값을 함께 보고, 보증금이 비슷한 거래끼리 비교해 주세요.', 'gx-warnbox'));
   const tbl = mkTable(['월', '건수', rent ? '월세 중간값' : '중간값', ...(rent ? ['보증금 중간값'] : []), '직전 대비 금액', '증감률', '비교 기준'],
     [...L].reverse().map((o) => [ymDot(o.mo), `${o.n}건`, o.med != null ? won1(o.med) : (o.n ? '표본 적음' : '거래 없음'), ...(rent ? [o.dep != null ? won(o.dep) : '—'] : []),
       sgnWon(o.diff), o.pct == null ? '—' : o.gap >= GAP_FAR ? '간격 큼' : pctNode(o.pct), o.pct == null ? '—' : o.gap > 1 ? `${o.gap}개월 전 대비` : '전월 대비']), [0]);
