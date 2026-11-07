@@ -63,10 +63,11 @@ function readLines(D){
     l3='<b>'+(big?'신규 계약이 대부분입니다.':'신규와 갱신이 비슷합니다.')+'</b> 신규 '+k.newN+'건 · 갱신 '+k.renewN+'건'+(k.renewMed==null?'(표본 부족)':'')+'. 층별 중간값은 '+floorParts(D).join(' · ')+'.';
   }else{
     // 보증금 구간 중 월세 중간값이 있는 구간(3건 이상)끼리 비교하고, 표본이 모자라거나 거래가 없는 구간은 끝에 따로 알린다
-    var tt=D.tiers||[],ok=tt.filter(function(x){return x.med!=='-'}),bad=tt.filter(function(x){return x.med==='-'});
-    var nm=function(x){return x.lab.indexOf('보증금')===0?x.lab:'보증금 '+x.lab};
+    var tt=D.tiers||[],ok=tt.filter(function(x){return x.ok}),bad=tt.filter(function(x){return !x.ok});
+    var cl=function(x){return x.lab.replace(/\s*\(.*\)\s*$/,'').replace(/ ~ /g,'~')};
+    var nm=function(x){return x.lab.indexOf('보증금')===0?cl(x):'보증금 '+cl(x)};
     var badTxt=bad.map(function(x){return ' '+nm(x)+' 구간은 '+(x.n==='0건'?'거래가 없습니다.':'표본 부족입니다.')}).join('');
-    l2=(ok.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+nm(ok[0])+' '+ok[0].med+', '+nm(ok[ok.length-1])+' '+ok[ok.length-1].med+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.')+badTxt;
+    l2=(ok.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+nm(ok[0])+' 월세 '+ok[0].rngS+', '+cl(ok[ok.length-1])+' '+ok[ok.length-1].rngS+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.')+badTxt;
     l3='<b>신규 '+k.newN+'건 · 갱신 '+k.renewN+'건입니다.</b> 층별 월세 중간값은 '+floorParts(D).join(' · ')+'.';
   }
   return [l1,l2,l3].filter(Boolean);
@@ -277,7 +278,12 @@ function monthBars(D,c0,cols){
 
 function page2(D,N,evi){
   var T=D.type,k=D.kpi;
-  var leg=function(key,name,f){var med='';if(f.n&&T==='월세'&&f.dep!=null)med=' · 중간값 보증금 '+fmt(f.dep)+' · 월세 '+fmt(f.rent);else if(f.n&&f.med&&T!=='매매')med=' · 중간값 '+fmt(f.med);
+  var leg=function(key,name,f){var med='';
+    if(T==='월세'){
+      // 월세: 층별 보증금·월세 범위(1건이면 그 값 하나, 0건이면 거래 없음)
+      var wr=!f.n?' · 거래 없음':f.dLo==null?'':' · 보증금 '+rngTxt(f.dLo,f.dHi)+' · 월세 '+rngTxt(f.rLo,f.rHi);
+      return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b>'+(f.n?' '+f.n+'건':'')+wr+'</span></div>'}
+    if(f.n&&f.med&&T!=='매매')med=' · 중간값 '+fmt(f.med);
     return '<div style="display:flex;align-items:center;gap:8px">'+SV[key]+'<span><b>'+name+'</b> '+esc(f.rng||'')+' · '+f.n+'건'+med+'</span></div>'};
   var legs=leg('L','저층',D.floors.L)+leg('M','중층',D.floors.M)+leg('H','고층',D.floors.H);
   if(T==='전세')legs+='<div style="display:flex;align-items:center;gap:8px">'+SV.V+'<span><b>월별 중간값</b> 한 달 3건 이상일 때만 표시</span></div>';
@@ -291,8 +297,8 @@ function page2(D,N,evi){
   var warn=T==='월세'?'<div style="background:#e6d9ce;padding:8px 12px;font-size:13px;line-height:20px;font-weight:700">'+esc(D.warn)+'</div>':'';
   var lower;
   if(T==='월세'){
-    var tr=(D.tiers||[]).map(function(t,i,a){return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 56px 90px 130px;column-gap:12px;padding:4px 0;border-bottom:1px solid '+(i===a.length-1?'#202227':'#cbc8c1')+';font-size:14px;line-height:22px"><span>'+esc(t.lab)+'</span><span style="text-align:right">'+esc(t.n)+'</span><span style="text-align:right">'+esc(t.med)+'</span><span style="text-align:right">'+esc(t.rng)+'</span></div>'}).join('');
-    lower='<div style="background:#fff;padding:12px 24px 16px 24px;display:flex;flex-direction:column;gap:8px">'+h2('보증금 구간별 월세')+'<div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:minmax(0,1fr) 56px 90px 130px;column-gap:12px;padding:4px 0;border-top:2px solid #202227;border-bottom:1px solid #202227;font-size:13px;line-height:20px;font-weight:700"><span>보증금 구간</span><span style="text-align:right">건수</span><span style="text-align:right">월세 중간값</span><span style="text-align:right">월세 범위</span></div>'+tr+'</div></div>';
+    var tr=(D.tiers||[]).map(function(t,i,a){return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 56px 170px;column-gap:12px;padding:4px 0;border-bottom:1px solid '+(i===a.length-1?'#202227':'#cbc8c1')+';font-size:14px;line-height:22px"><span>'+esc(t.lab)+'</span><span style="text-align:right">'+esc(t.n)+'</span><span style="text-align:right">'+esc(t.rngS)+'</span></div>'}).join('');
+    lower='<div style="background:#fff;padding:12px 24px 16px 24px;display:flex;flex-direction:column;gap:8px">'+h2('보증금 구간별 월세')+'<div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:minmax(0,1fr) 56px 170px;column-gap:12px;padding:4px 0;border-top:2px solid #202227;border-bottom:1px solid #202227;font-size:13px;line-height:20px;font-weight:700"><span>보증금 구간</span><span style="text-align:right">건수</span><span style="text-align:right">월세 범위</span></div>'+tr+'</div></div>';
   }else{
     // 매매·전세: 월별 중간값 표와 전월 대비 줄 대신 월별 증감률 막대그래프(최근 12개월)
     var cols=D.months.length-1,c0=Math.max(0,cols-12);
