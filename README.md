@@ -150,6 +150,9 @@ GET /api/trades?kind=report&apt=<단지>&area=<면적|all>&months=12&chart=all&f
 - chart: 매매 `scatter`(점 그래프)·`floor`(층별 거래가격 구간)·`monthly`(월별 중간값과 증감률), 전세 `scatter`·`monthly`, 월세 `scatter`(가로 보증금·세로 월세)·`deposit`(보증금 구간별 월세 표). png·svg는 면적 하나·type 하나·chart 하나씩, gallery는 `area=all`이면 면적별로 제목을 달아 전부 보여 줍니다.
 - 그리는 코드는 `public/report-charts.js` 한 곳이고 PDF(`report.js`)와 이미지(`lib/report-image.js`)가 같이 씁니다. 숫자는 `report-stats.js` 결과 그대로라, PDF 2쪽 그래프의 SVG와 이미지 안 그래프 SVG가 문자열까지 같습니다.
 - PNG는 서버에서 `@resvg/resvg-js`로 SVG를 변환합니다. 한글 글꼴은 `lib/fonts`의 Noto Sans KR(SIL OFL) 부분집합이며, 흔한 한글만 담은 작은 글꼴을 기본으로 쓰고 드문 글자가 있으면 전체 음절 글꼴로 바꿉니다(PNG 하나 약 0.3초). 글꼴 다시 만들기는 `scripts/build-report-fonts.js` 머리말을 보세요.
+- **화면의 "그래프 이미지" 버튼**: "이 탭 PDF로 저장" 바로 옆에 있고, 지금 고른 단지·면적의 갤러리(`months=12` 고정)를 새 탭으로 엽니다. 면적을 안 골랐으면 `area=all`, 지역이 기본(41115)이 아니면 `lawd=`, 같은 이름 단지를 가르려고 `dong=`도 붙입니다.
+- **번호와 저장 파일 이름**: ①매매 점 ②매매 층별 ③매매 월별 ④전세 점 ⑤전세 월별 ⑥월세 점 ⑦월세 보증금구간 순서이고, 파일은 `01_수원센트럴아이파크자이_59.99_매매_점그래프.png`처럼 번호로 시작합니다. png는 `Content-Disposition: attachment`라 누르면 새 탭에 뜨지 않고 바로 내려받아집니다.
+- **"7개 모두 저장"**: `format=zip`(면적 하나, 압축 없이 담은 zip, `lib/zip.js`)으로 PNG 7개를 한 번에 받습니다. `area=all` 갤러리는 면적마다 "7개 모두 저장"이 있습니다.
 - svg는 글꼴을 포함하지 않아 보는 기기에 Noto Sans KR이 없으면 다른 한글 글꼴로 보입니다. 올리는 용도는 png를 쓰세요.
 
 ## 폴더 구성
@@ -161,7 +164,8 @@ lib/core.js          데이터 처리 공통 로직 (실거래가·공시가격 
 lib/auth.js          공용 비밀번호 로그인 (서명 쿠키 세션)
 lib/report-route.js  리포트 데이터 조회 (/api/trades?kind=report) JSON 조립·단지/면적 찾기
 lib/report-text.js   리포트 데이터 조회의 format=text 변환
-lib/report-image.js  그래프 이미지(PNG·SVG)·갤러리 조립
+lib/report-image.js  그래프 이미지(PNG·SVG)·갤러리 조립, 저장 파일 이름 규칙
+lib/zip.js           PNG 여러 개를 zip 하나로 (압축 없이, 외부 의존성 없음)
 lib/fonts/           그래프 이미지용 Noto Sans KR 부분집합 글꼴 (SIL OFL, OFL-LICENSE.txt)
 api/                 Vercel 서버리스 함수 (lib/core.js·lib/auth.js를 호출; aptdetail·aptinfo·landuse 포함)
 vercel.json          Vercel 배포 설정

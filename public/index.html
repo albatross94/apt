@@ -139,6 +139,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-login input{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.5rem .7rem}
 .gx-login button{font:inherit;padding:.55rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 .gx-login button:disabled{opacity:.5;cursor:wait}
+.gx-pdfrow{display:flex;flex-wrap:wrap;gap:.6rem;align-self:flex-start}
 .gx-pdf{font:inherit;align-self:flex-start;padding:.55rem 1.2rem;border-radius:9px;border:1px solid var(--color-fg);background:transparent;color:var(--color-fg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 .gx-printonly{display:none;margin:0;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
 #pdf-dlg{border:1px solid var(--cds-border);border-radius:var(--cds-radius);background:var(--color-bg);color:var(--color-fg);padding:var(--cds-pad-lg);max-width:min(24rem,calc(100vw - 2rem));font-family:var(--font-sans)}
@@ -226,7 +227,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   :root{--color-bg:#e6d9ce;--color-fg:#202227;--color-fg-muted:#423f3d;--color-panel:#ffffff;--color-border-line:#cbc8c1;--color-bad:#8e1b1c;
     --cds-chart-grid:#d8d2c8;--cds-chart-axis:#8a857d;--cds-border:#b9b4ab;--cds-text-secondary:#423f3d;
     --c0:#8e1b1c;--c1:#2f6f8f;--c2:#2e7d6b;--c3:#5b4b8a;--c4:#b8960b;--c5:#d9531e;--c6:#c2417a;--c7:#6b6560;color-scheme:light}
-  .no-print,#tabs,.gx-pdf,.gx-ctrl button,#gs-status{display:none!important}
+  .no-print,#tabs,.gx-pdf,.gx-pdfrow,.gx-ctrl button,#gs-status{display:none!important}
   .gx-ctrl{display:flex}
   .gx-printonly{display:block}
   .gx-warnbox{background:#fff3dc;border-color:#f0d49a;color:#7a4b00}
@@ -418,7 +419,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
           <button type="button" data-k="gongsi">공시가격</button>
           <button type="button" data-k="cmp">단지비교</button>
         </div>
-        <button type="button" class="gx-pdf" id="pdf-btn">이 탭 PDF로 저장</button>
+        <div class="gx-pdfrow">
+          <button type="button" class="gx-pdf" id="pdf-btn">이 탭 PDF로 저장</button>
+          <button type="button" class="gx-pdf" id="chart-btn" title="최근 12개월 그래프를 PNG로 저장하는 페이지가 열립니다">그래프 이미지</button>
+        </div>
       </section>
 
       <div class="gx-col" id="tab-body"></div>
@@ -1535,6 +1539,15 @@ $('pdf-btn').onclick = () => {
   pdfDlg.showModal(); $('pdf-name').focus();
 };
 $('pdf-cancel').onclick = () => pdfDlg.close();
+// 그래프 이미지: 지금 고른 단지·면적의 최근 12개월 그래프 갤러리(7개 PNG 저장)를 새 탭으로 연다. 기간은 화면 조회 기간과 상관없이 12개월 고정(블로그 기준).
+// 면적을 아직 안 골랐으면 area=all. 지역이 기본(41115)이 아니면 lawd, 같은 이름 단지를 가르도록 동도 함께 보낸다.
+$('chart-btn').onclick = () => {
+  if (!state.apt) return;
+  const e = encodeURIComponent, p = [['kind', 'report'], ['apt', state.apt], ['area', state.pick == null ? 'all' : String(state.pick)], ['months', '12'], ['chart', 'all'], ['format', 'gallery']];
+  if (state.lawd && state.lawd !== '41115') p.push(['lawd', state.lawd]);
+  if (state.dong) p.push(['dong', state.dong]);
+  window.open('/api/trades?' + p.map(([k, v]) => k + '=' + e(v)).join('&'), '_blank', 'noopener');
+};
 $('pdf-name').oninput = $('pdf-tel').oninput = () => { $('pdf-file').textContent = $('pdf-name').value.trim() ? '파일명: ' + pdfFile($('pdf-name').value, $('pdf-tel').value) + '.pdf' : ''; };
 $('pdf-form').onsubmit = async (e) => {
   e.preventDefault();
