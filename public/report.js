@@ -132,8 +132,8 @@ function chart(D){
   var f1=function(v){return v.toFixed(1)},top=8,H=182;
   if(D.type==='월세'){
     var X0=52,X1=640,xt=D.xt,yt=D.yt,maxX=xt[xt.length-1],maxY=yt[0],g='',yl='',xl='';
-    yt.forEach(function(v,i){var y=top+(maxY-v)/maxY*H;if(v>0)g+='<path d="M44 '+f1(y)+'H658"/>';yl+='<text x="38" y="'+f1(y+4)+'">'+v+'만</text>'});
-    xt.forEach(function(v){var x=X0+v/maxX*(X1-X0);xl+='<text x="'+f1(x)+'" y="208">'+(v===0?'0':v<10000?(v/1000)+'천만':(v/10000)+'억')+'</text>'});
+    yt.forEach(function(v,i){var y=top+(maxY-v)/maxY*H;if(v>0)g+='<path d="M44 '+f1(y)+'H658"/>';yl+='<text x="38" y="'+f1(y+(i===0?6:i===yt.length-1?2:4))+'">'+v+'만</text>'});
+    xt.forEach(function(v){var x=X0+v/maxX*(X1-X0);xl+='<text x="'+f1(x)+'" y="212">'+(v===0?'0':v<10000?(v/1000)+'천만':(v/10000)+'억')+'</text>'});
     var dots=D.dots.map(function(p){return mark(p.k,p.r,X0+p.x/maxX*(X1-X0),top+(maxY-Math.max(0,Math.min(maxY,p.y)))/maxY*H)}).join('');
     return svgWrap(D,'전용 '+D.sel.a+'㎡ 월세 '+D.kpi.n+'건의 보증금과 월세 분포',
       '<g stroke="#cbc8c1" stroke-width="1">'+g+'</g><path d="M44 190H658" stroke="#423f3d" stroke-width="1"/><g font-size="12" fill="#423f3d" text-anchor="end">'+yl+'</g><g font-size="12" fill="#423f3d" text-anchor="middle">'+xl+'</g>'+dots);
@@ -142,8 +142,8 @@ function chart(D){
   var xs=function(d){return X0t+d/D.daysLast*(X1t-X0t)};
   var ys=function(p){p=Math.max(minT,Math.min(maxT,p));return top+(maxT-p)/(maxT-minT)*H};
   var g2='',yl2='';
-  tk.forEach(function(t,i){var y=top+i*H/(n-1);if(i<n-1)g2+='<path d="M44 '+f1(y)+'H658"/>';yl2+='<text x="38" y="'+f1(y+4)+'">'+t.toFixed(1)+'억</text>'});
-  var stp=D.months.length>30?6:D.months.length>14?3:1;var xl2=D.months.map(function(m,i){return i%stp?'':'<text x="'+f1(xs(D.starts[i]))+'" y="208">'+m+'</text>'}).join('');
+  tk.forEach(function(t,i){var y=top+i*H/(n-1);if(i<n-1)g2+='<path d="M44 '+f1(y)+'H658"/>';yl2+='<text x="38" y="'+f1(y+(i===0?6:i===n-1?2:4))+'">'+t.toFixed(1)+'억</text>'});
+  var stp=D.months.length>30?6:D.months.length>14?3:1;var xl2=D.months.map(function(m,i){return i%stp?'':'<text x="'+f1(xs(D.starts[i]))+'" y="212">'+m+'</text>'}).join('');
   var dots2=D.dots.map(function(p){return mark(p.k,p.r,xs(p.d),ys(p.p))}).join('');
   // 월별 중간값 선·점은 전세 그래프에만 둔다(매매는 아래 층별 구간 막대와 월별 증감률 막대로 보여 준다)
   var withMed=D.type!=='매매',runs=[],cur=[];
