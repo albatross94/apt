@@ -13,7 +13,15 @@ function fmt(v){var sign=v<0?'−':'';v=Math.abs(Math.round(v));var e=Math.floor
   return sign+m.toLocaleString('en-US')+'만원'}
 function h2(t){return '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:20px;background:#8e1b1c;display:block"></span><h2 style="margin:0;font-size:20px;line-height:28px;font-weight:700">'+esc(t)+'</h2></div>'}
 function lab(l,v){return '<div style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">'+esc(l)+'</span><span style="font-size:16px;line-height:26px;font-weight:700;word-break:keep-all">'+esc(v)+'</span></div>'}
-function slim(D,n,N){return '<div style="background:#8e1b1c;color:#fff;padding:12px 40px;display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><span style="font-size:16px;line-height:26px;font-weight:800">'+esc(D.complex)+' · 전용 '+esc(D.sel.a)+'㎡ 실거래가 분석리포트</span></div><span style="font-size:13px;line-height:20px;font-weight:700">'+n+' / '+N+'</span></div>'}
+// 2·3쪽 머리글은 항상 한 줄. 단지명(.rn-name)만 줄어든다: CSS로 한 줄 고정 + 넘치면 끝을 '…'로 줄이고(text-overflow),
+// Report.fit()이 폰트가 로드된 뒤 실제 폭을 재서 글자 크기를 16→12px로 단계적으로 줄인다. 전용면적·'실거래가 분석리포트'·쪽 번호는 줄지 않는다.
+function slim(D,n,N){return '<div style="background:#8e1b1c;color:#fff;padding:12px 40px;display:flex;align-items:center;justify-content:space-between;gap:16px"><div style="display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0"><svg width="24" height="24" viewBox="0 0 30 30" fill="none" aria-hidden="true" style="flex:none"><path d="M4 26V13L15 4L26 13V26Z" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="miter"/></svg><span style="display:flex;min-width:0;font-size:16px;line-height:26px;font-weight:800;white-space:nowrap"><span class="rn-name" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(D.complex)+'</span><span style="flex:none;white-space:pre"> · 전용 '+esc(D.sel.a)+'㎡ 실거래가 분석리포트</span></span></div><span style="flex:none;white-space:nowrap;font-size:13px;line-height:20px;font-weight:700">'+n+' / '+N+'</span></div>'}
+// root 안의 머리글 단지명을 한 줄에 맞춘다(16px부터 12px까지 1px씩 줄이고, 그래도 길면 CSS가 '…'로 줄인다). 폰트가 로드된 뒤에 불러야 폭이 정확하다.
+function fit(root){
+  var els=(root||document).querySelectorAll('.rn-name');
+  for(var k=0;k<els.length;k++){var el=els[k];
+    for(var sz=16;sz>=12;sz--){el.style.fontSize=sz+'px';if(el.scrollWidth<=el.clientWidth+0.5)break}}
+}
 function foot(n,N){return '<div style="margin:0 40px;padding:10px 0 16px 0;border-top:1px solid #423f3d;display:flex;justify-content:space-between;font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><span style="display:flex;flex-direction:column"><span>'+esc(co())+'</span>'+(offLine()?'<span style="font-size:8px;line-height:12px">'+esc(offLine())+'</span>':'')+'</span><span>'+n+' / '+N+'</span></div>'}
 var BODY='padding:16px 40px 0 40px;display:flex;flex-direction:column;gap:16px;flex:1 1 auto';
 var ORD=['','가장','두 번째로','세 번째로','네 번째로','다섯 번째로','여섯 번째로','일곱 번째로','여덟 번째로','아홉 번째로'];
@@ -335,6 +343,7 @@ function needP3(D){return !!(D.hoga||D.ref||D.type==='월세')}
 function build(D){var N=needP3(D)?3:2;var p=[page1(D,N),page2(D,N,N===2)];if(N===3)p.push(page3(D,N));return p}
 window.Report = {
   build: build,
+  fit: fit,
   setConfig: function (c) { ['name', 'sub', 'tel', 'rep', 'addr', 'reg'].forEach(function (k) { if (c && typeof c[k] === 'string') CFG[k] = c[k].trim(); }); },
   getConfig: function () { return { name: CFG.name, sub: CFG.sub, tel: CFG.tel, rep: CFG.rep, addr: CFG.addr, reg: CFG.reg }; },
 };

@@ -1608,6 +1608,7 @@ async function saveReportPdf(name, tel) {
   try {
     try { await document.fonts.load('700 16px "Noto Sans KR"', '한글'); } catch {}
     await document.fonts.ready;
+    Report.fit(stage);   // 2·3쪽 머리글 단지명을 한 줄에 맞춘다(폰트가 로드된 뒤)
     const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const pgs = stage.querySelectorAll('.pg');
     for (let i = 0; i < pgs.length; i++) {
