@@ -200,7 +200,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-kpop button.sec{font:inherit;font-size:12px;font-weight:600;padding:.4rem .6rem;border:1px solid #8e1b1c;border-radius:8px;background:#fff;color:#8e1b1c;cursor:pointer}
 /* 인쇄(PDF)는 항상 밝은 색으로. 조회 조건·탭·버튼은 빼고, 선택 상자는 어떤 값을 골랐는지 보이도록 남긴다 */
 /* 브라우저가 붙이는 머리글·바닥글(날짜, 파일명)은 @page 여백을 0으로 두면 나오지 않는다.
-   대신 쪽마다 위아래 여백이 있도록, 반복되는 머리·바닥 표 그룹(.pf-h/.pf-f)에 빈 칸을 둔다 */
+   대신 쪽마다 위아래 여백이 있도록, 전체를 감싼 .pf 에 쪽마다 반복되는 위·아래 패딩(box-decoration-break:clone)을 둔다 */
 @page{margin:0;size:A4 portrait}
 @media print{
   /* 쪽 배치: 카드·그래프·표 한 줄은 쪽 경계에서 잘리지 않게 하고, 제목은 다음 내용과 붙여 둔다 */
@@ -217,9 +217,10 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   .gx-head h1{font-size:1.6rem}
   .gx-chart{min-height:0}
   .wrap{padding:0 14mm}
-  .pf{display:table;width:100%}
-  .pf-h{display:table-header-group}.pf-b{display:table-row-group}.pf-f{display:table-footer-group}
-  .pf .sp{height:12mm}
+  /* 모든 쪽 위·아래 여백 12mm 이상(첫 쪽 포함). 머리·바닥 표 그룹은 내용이 큰 한 덩어리일 때 이어지는 쪽에서 반복되지 않아
+     (쪽을 넘긴 쪽의 여백이 0이 됨), 쪽마다 위·아래 패딩이 다시 붙는 box-decoration-break:clone 으로 바꿨다. 지원하지 않는 낡은 브라우저는 첫·끝 쪽에만 여백이 생긴다 */
+  .pf{display:block;padding:12.5mm 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  .pf-h,.pf-f{display:none}
   :root{--color-bg:#e6d9ce;--color-fg:#202227;--color-fg-muted:#423f3d;--color-panel:#ffffff;--color-border-line:#cbc8c1;--color-bad:#8e1b1c;
     --cds-chart-grid:#d8d2c8;--cds-chart-axis:#8a857d;--cds-border:#b9b4ab;--cds-text-secondary:#423f3d;
     --c0:#8e1b1c;--c1:#2f6f8f;--c2:#2e7d6b;--c3:#5b4b8a;--c4:#b8960b;--c5:#d9531e;--c6:#c2417a;--c7:#6b6560;color-scheme:light}
