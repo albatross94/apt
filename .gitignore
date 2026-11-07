@@ -6,3 +6,5 @@ cache/
 .env*
 학교/
 *.xlsx
+
+node_modules/

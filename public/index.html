@@ -6,6 +6,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="/report-stats.js"></script>
+<script src="/report-charts.js"></script>
 <script src="/report.js"></script>
 <style>
 #map-wrap{display:flex;gap:8px;height:520px}
@@ -1612,8 +1613,6 @@ async function saveReportPdf(name, tel) {
   } finally { stage.remove(); }
 }
 
-// 눈금 간격: 후보 중 칸 수가 maxN 이하가 되는 가장 작은 간격
-const niceStep = (span, cands, maxN) => cands.find((s) => span / s <= maxN) || cands.at(-1);
 const p2 = (n) => String(n).padStart(2, '0');
 
 function buildReportData() {
@@ -1622,12 +1621,8 @@ function buildReportData() {
   const rows = D0[tab].filter((t) => t.area === pick);
   if (!rows.length) throw new Error(`전용 ${pick}㎡의 ${KN} 거래가 없어 리포트를 만들 수 없습니다. 다른 면적을 골라 주세요.`);
   const now = new Date(), latestIso = d3.max(all, (t) => t.date) || '';
-  const mlist = monthsInRange(), first = Date.UTC(+mlist[0].slice(0, 4), +mlist[0].slice(5) - 1, 1);
-  const nextM = d3.utcFormat('%Y-%m')(d3.utcMonth.offset(new Date(mlist.at(-1) + '-01T00:00:00Z'), 1));
-  const labels = [...mlist, nextM];
-  const starts = labels.map((m) => Math.round((Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 1) - first) / 864e5));
-  const dayOf = (s) => Math.round((Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) - first) / 864e5);
-  const kOf = (t) => 'LMH'[FLOOR_BANDS.indexOf(bandOf(t))];
+  const mlist = monthsInRange();
+  const CD = RS.chartData(rows, tab, mlist);   // 점 그래프의 점·눈금·월별 중간값·가로축 월 라벨 (PDF와 그래프 이미지가 같은 함수)
   const nw = rows.filter((t) => t.gbn === '신규'), rn = rows.filter((t) => t.gbn === '갱신');
   // PDF '가공 방법': 매매는 해제·직거래를 데이터 단계에서 뺐고, 이 면적에서 뺀 건수를 함께 적는다
   const ex = tab === 'sale' ? exclCounts('sale') : null;
@@ -1646,7 +1641,7 @@ function buildReportData() {
     cond: `계약일 ${ymLabel(state.from)} ~ ${ymLabel(state.to)} · ${regionLabel()} · 단지명 ${state.apt} · 전용 ${pick}㎡`,
     basis: `${dtstr(I.at)} 수집 · 계약일 기준 · 이 단지의 가장 최근 계약일 ${latestIso || '—'}`,
     proc: procTxt,
-    months: labels.map((m) => m.slice(2, 4) + '.' + m.slice(5)), starts, daysLast: starts.at(-1),
+    months: CD.months, starts: CD.starts, daysLast: CD.daysLast,
     dots: [], meds: [], hoga: null, ref: null, unsupported: false,
   };
   // 층 구간별 건수·중간값·범위 (PDF와 API가 같은 RS.floorStats)
@@ -1676,23 +1671,10 @@ function buildReportData() {
   if (tab !== 'sale') { D.legNew = nw.length; D.legRenew = rn.length; }
   // 그래프
   if (tab === 'wolse') {
-    const maxP = d3.max(rows, (t) => t.price), maxR = d3.max(rows, (t) => t.rent);
-    const sx = niceStep(maxP, [1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000], 6), sy = niceStep(maxR, [5, 10, 20, 25, 50, 100, 200, 500, 1000], 5);
-    D.xt = d3.range(0, Math.ceil(maxP / sx) * sx + 1, sx); D.yt = d3.range(0, Math.ceil(maxR / sy) * sy + 1, sy).reverse();
-    D.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, x: t.price, y: t.rent }));
-    D.warn = '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.';
+    D.xt = CD.xt; D.yt = CD.yt; D.dots = CD.dots; D.warn = CD.warn;
     D.tiers = RS.depositBands(rows, fmt).map((t) => ({ lab: t.lab, n: `${t.n}건`, ok: t.ok, rngS: t.rngS, rng: t.rng }));
   } else {
-    const ys = d3.extent(rows, (t) => t.price / 10000), st = niceStep(ys[1] - ys[0] || 0.1, [0.1, 0.2, 0.5, 1, 2, 5, 10, 20], 6);
-    const lo = Math.floor(ys[0] / st + 1e-9) * st, hi = Math.max(Math.ceil(ys[1] / st - 1e-9) * st, lo + st);
-    D.ticks = d3.range(Math.round(lo / st), Math.round(hi / st) + 1).map((i) => +(i * st).toFixed(2)).reverse();
-    D.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, d: dayOf(t.date), p: t.price / 10000 }));
-    // 월별 중간값: 한 달 3건 이상인 달만
-    for (const [ym, v] of d3.group(rows, (t) => t.ym)) {
-      const mi = mlist.indexOf(ym);
-      if (v.length >= LOW && mi >= 0) D.meds.push({ mi, d: starts[mi] + 15, p: med(v) / 10000 });
-    }
-    D.meds.sort((a, b) => a.d - b.d);
+    D.ticks = CD.ticks; D.dots = CD.dots; D.meds = CD.meds;
   }
   // 현재 호가와 실거래 비교 (askCard와 같은 기준) — 호가를 입력했으면 hoga, 아니면 최근 6개월 실거래 기준(ref)
   const A = { price: '', rent: '', floor: '', src: '', date: '', ...state.ask[tab] }, wolse = tab === 'wolse', PN = tab === 'sale' ? '거래가' : '보증금';

@@ -138,6 +138,20 @@ GET /api/trades?kind=report&apt=<단지명>&area=<59 | 84.97 | all>&months=12&ty
 - 계산은 PDF 화면과 같은 `public/report-stats.js` 한 파일을 씁니다(건수·최저최고·층별 범위·월별 중간값·증감률·전세가율·최근 6개월). 규칙: 매매는 해제·직거래 제외(제외 건수 표시), 3건 미만 "표본 적음"·0건 "거래 없음", 월별 중간값은 한 달 3건 이상인 달만, 비교 간격 4개월 이상 "간격 큼", 층 구간 저층 1~8·중층 9~16·고층 17층 이상(면적 전체 기준). 금액은 원 단위 숫자(`won`)와 표시 문자열(`display`)을 함께 줍니다.
 - 응답 헤더는 `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`입니다.
 
+### 그래프 이미지 (블로그·인스타그램용)
+
+PDF 2쪽과 같은 그래프를 가로 1080px(PNG는 2배인 2160px) 이미지로 받습니다. 제목(단지명·전용면적·유형·그래프 이름)과 맨 아래 출처 줄(출처·조회 기간·기준일·사무소 연락처)이 이미지 안에 들어 있어 이미지만 퍼져도 출처가 남습니다.
+
+```
+GET /api/trades?kind=report&apt=<단지>&area=<면적>&months=12&type=<trade|jeonse|rent>&chart=<이름>&format=<png|svg>
+GET /api/trades?kind=report&apt=<단지>&area=<면적|all>&months=12&chart=all&format=gallery    한 페이지에 전부, 그래프마다 "PNG 저장" 버튼
+```
+
+- chart: 매매 `scatter`(점 그래프)·`floor`(층별 거래가격 구간)·`monthly`(월별 중간값과 증감률), 전세 `scatter`·`monthly`, 월세 `scatter`(가로 보증금·세로 월세)·`deposit`(보증금 구간별 월세 표). png·svg는 면적 하나·type 하나·chart 하나씩, gallery는 `area=all`이면 면적별로 제목을 달아 전부 보여 줍니다.
+- 그리는 코드는 `public/report-charts.js` 한 곳이고 PDF(`report.js`)와 이미지(`lib/report-image.js`)가 같이 씁니다. 숫자는 `report-stats.js` 결과 그대로라, PDF 2쪽 그래프의 SVG와 이미지 안 그래프 SVG가 문자열까지 같습니다.
+- PNG는 서버에서 `@resvg/resvg-js`로 SVG를 변환합니다. 한글 글꼴은 `lib/fonts`의 Noto Sans KR(SIL OFL) 부분집합이며, 흔한 한글만 담은 작은 글꼴을 기본으로 쓰고 드문 글자가 있으면 전체 음절 글꼴로 바꿉니다(PNG 하나 약 0.3초). 글꼴 다시 만들기는 `scripts/build-report-fonts.js` 머리말을 보세요.
+- svg는 글꼴을 포함하지 않아 보는 기기에 Noto Sans KR이 없으면 다른 한글 글꼴로 보입니다. 올리는 용도는 png를 쓰세요.
+
 ## 폴더 구성
 
 ```
@@ -147,6 +161,8 @@ lib/core.js          데이터 처리 공통 로직 (실거래가·공시가격 
 lib/auth.js          공용 비밀번호 로그인 (서명 쿠키 세션)
 lib/report-route.js  리포트 데이터 조회 (/api/trades?kind=report) JSON 조립·단지/면적 찾기
 lib/report-text.js   리포트 데이터 조회의 format=text 변환
+lib/report-image.js  그래프 이미지(PNG·SVG)·갤러리 조립
+lib/fonts/           그래프 이미지용 Noto Sans KR 부분집합 글꼴 (SIL OFL, OFL-LICENSE.txt)
 api/                 Vercel 서버리스 함수 (lib/core.js·lib/auth.js를 호출; aptdetail·aptinfo·landuse 포함)
 vercel.json          Vercel 배포 설정
 package.json         Node 버전 지정, npm start
@@ -154,6 +170,7 @@ package.json         Node 버전 지정, npm start
 public/index.html    화면 (실거래가 확인 리포트)
 public/report.js     PDF 분석리포트 양식 (A4 2~3쪽 HTML 생성)
 public/report-stats.js  통계 계산 공통 모듈 (PDF 화면과 리포트 데이터 조회 API가 같이 씀)
+public/report-charts.js 그래프 그리기 공통 모듈 (PDF 2쪽과 그래프 이미지가 같이 씀)
 public/regions.json  전국 시군구 코드 목록
 public/hospital.js  탭 전환과 병원·약국검색 화면
 lib/hira-sgg.json   법정동 시군구 코드 → 건강보험심사평가원 시도·시군구 코드 (scripts/build-hira-sgg.js 로 생성)

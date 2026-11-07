@@ -133,6 +133,41 @@
   // 전세가율: 같은 기간 전세 중간값 ÷ 매매 중간값(%). 한쪽이 비면 null
   function ratioOf(a, sale) { return a.length && sale.length ? (medPrice(a) / medPrice(sale) * 100).toFixed(1) + '%' : null; }
 
+  /* ---------- 그래프 데이터 (PDF 2쪽 점 그래프·월별 막대와 그래프 이미지가 같이 쓴다) ---------- */
+  const niceStep = (span, cands, maxN) => cands.find((s) => span / s <= maxN) || cands[cands.length - 1];   // 눈금 간격: 칸 수가 maxN 이하인 가장 작은 간격
+  const range = (a, b, s) => { const n = Math.max(0, Math.ceil((b - a) / s)), o = []; for (let i = 0; i < n; i++) o.push(a + i * s); return o; };   // d3.range
+  const utcDay = (y, m, d) => Date.UTC(y, m - 1, d);
+  // 조회 월 목록(['2025-12', …]) → 가로축 월 라벨('25.12' …, 끝에 다음 달 하나 더), 각 달 1일의 일수(starts), 계약일 → 일수(dayOf)
+  function chartBase(mlist) {
+    const first = utcDay(+mlist[0].slice(0, 4), +mlist[0].slice(5), 1), last = mlist[mlist.length - 1];
+    let ny = +last.slice(0, 4), nm = +last.slice(5) + 1; if (nm > 12) { nm = 1; ny++; }
+    const labels = mlist.concat([ny + '-' + String(nm).padStart(2, '0')]);
+    const starts = labels.map((m) => Math.round((utcDay(+m.slice(0, 4), +m.slice(5), 1) - first) / 864e5));
+    return { months: labels.map((m) => m.slice(2, 4) + '.' + m.slice(5)), starts, daysLast: starts[starts.length - 1],
+      dayOf: (s) => Math.round((utcDay(+s.slice(0, 4), +s.slice(5, 7), +s.slice(8, 10)) - first) / 864e5) };
+  }
+  // 점 그래프용 점·눈금과 월별 중간값(한 달 3건 이상인 달만). 매매·전세: 가로 계약일·세로 억 원, 월세: 가로 보증금·세로 월세
+  function chartData(rows, kind, mlist) {
+    const base = chartBase(mlist), kOf = (t) => 'LMH'[bandIndex(t.floor)], out = { months: base.months, starts: base.starts, daysLast: base.daysLast, dots: [], meds: [] };
+    if (kind === 'wolse') {
+      const maxP = maxOf(rows, price), maxR = maxOf(rows, (t) => t.rent);
+      const sx = niceStep(maxP, [1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000], 6), sy = niceStep(maxR, [5, 10, 20, 25, 50, 100, 200, 500, 1000], 5);
+      out.xt = range(0, Math.ceil(maxP / sx) * sx + 1, sx); out.yt = range(0, Math.ceil(maxR / sy) * sy + 1, sy).reverse();
+      out.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, x: t.price, y: t.rent }));
+      out.warn = '월세는 보증금이 클수록 낮아집니다. 월세 금액만 비교하지 말고, 보증금이 비슷한 거래끼리 비교해 주세요.';
+    } else {
+      const lo0 = minOf(rows, (t) => t.price / 10000), hi0 = maxOf(rows, (t) => t.price / 10000), st = niceStep(hi0 - lo0 || 0.1, [0.1, 0.2, 0.5, 1, 2, 5, 10, 20], 6);
+      const lo = Math.floor(lo0 / st + 1e-9) * st, hi = Math.max(Math.ceil(hi0 / st - 1e-9) * st, lo + st);
+      out.ticks = range(Math.round(lo / st), Math.round(hi / st) + 1, 1).map((i) => +(i * st).toFixed(2)).reverse();
+      out.dots = rows.map((t) => ({ k: kOf(t), r: t.gbn === '갱신' ? 1 : 0, d: base.dayOf(t.date), p: t.price / 10000 }));
+      const g = new Map();
+      for (const t of rows) (g.get(t.ym) || g.set(t.ym, []).get(t.ym)).push(t);
+      for (const [ym, v] of g) { const mi = mlist.indexOf(ym); if (v.length >= LOW && mi >= 0) out.meds.push({ mi, d: base.starts[mi] + 15, p: medPrice(v) / 10000 }); }
+      out.meds.sort((a, b) => a.d - b.d);
+    }
+    return out;
+  }
+
   /* ---------- 표기 ---------- */
   function won(v) {   // 만원 단위 값 → '8억 5,000만원'
     const sign = v < 0 ? '−' : ''; v = Math.abs(Math.round(v));
@@ -157,5 +192,5 @@
   }
 
   return { LOW, GAP_FAR, PY, FLOOR_BANDS, DEPOSIT_BINS, median, minOf, maxOf, medPrice, keepOf, exclCounts, monthsRange, bandIndex,
-    monthlyChange, changeSummary, extremes, floorStats, depositBands, recent6, ratioOf, won, rentTxt, rngTxt, pctTxt, ymDot, floorMedParts };
+    monthlyChange, changeSummary, extremes, floorStats, depositBands, recent6, ratioOf, won, rentTxt, rngTxt, pctTxt, ymDot, floorMedParts, niceStep, chartBase, chartData };
 });
