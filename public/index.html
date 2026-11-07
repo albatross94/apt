@@ -1543,7 +1543,9 @@ $('pdf-cancel').onclick = () => pdfDlg.close();
 // 면적을 아직 안 골랐으면 area=all. 지역이 기본(41115)이 아니면 lawd, 같은 이름 단지를 가르도록 동도 함께 보낸다.
 $('chart-btn').onclick = () => {
   if (!state.apt) return;
-  const e = encodeURIComponent, p = [['kind', 'report'], ['apt', state.apt], ['area', state.pick == null ? 'all' : String(state.pick)], ['months', '12'], ['chart', 'all'], ['format', 'gallery']];
+  // end: 끝 월(이번 달을 뺀 전월). 서버 기본 기간과 같고, 주소에 넣어 두면 기간이 바뀔 때 캐시도 새로 쓰인다.
+  const pm = new Date(); pm.setDate(1); pm.setMonth(pm.getMonth() - 1);
+  const e = encodeURIComponent, p = [['kind', 'report'], ['apt', state.apt], ['area', state.pick == null ? 'all' : String(state.pick)], ['months', '12'], ['end', ym(pm)], ['chart', 'all'], ['format', 'gallery']];
   if (state.lawd && state.lawd !== '41115') p.push(['lawd', state.lawd]);
   if (state.dong) p.push(['dong', state.dong]);
   window.open('/api/trades?' + p.map(([k, v]) => k + '=' + e(v)).join('&'), '_blank', 'noopener');
