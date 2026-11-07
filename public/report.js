@@ -31,13 +31,13 @@ function floorParts(D){
   return FL.map(function(z){var f=D.floors[z[0]];
     if(!(f.n>0))return z[1]+'은 거래 없음';
     var v=D.type==='월세'?(f.rent!=null?fmt(f.rent):null):(f.med!=null?fmt(f.med):null);
-    return v?z[1]+' '+v+'('+f.n+'건'+(f.n<10?'·표본 적음':'')+')':z[1]+' '+f.n+'건'});
+    return v?z[1]+' '+v+'('+f.n+'건'+(f.n<3?'·표본 적음':'')+')':z[1]+' '+f.n+'건'});
 }
 // 층별 월세 범위(월세 탭 1쪽): 2쪽 범례와 같은 값. 1건이면 값 하나, 0건이면 '거래 없음'
 function floorRentParts(D){
   return FL.map(function(z){var f=D.floors[z[0]];
     if(!(f.n>0))return z[1]+'은 거래 없음';
-    return z[1]+' '+rngTxt(f.rLo,f.rHi)+'('+f.n+'건'+(f.n<10?'·표본 적음':'')+')'});
+    return z[1]+' '+rngTxt(f.rLo,f.rHi)+'('+f.n+'건'+(f.n<3?'·표본 적음':'')+')'});
 }
 // 최저~최고 표기: 8억 7,000만~11억 9,000만원 (앞 값의 끝 '원'을 떼어 붙인다)
 function rngTxt(lo,hi){var a=fmt(lo);return lo===hi?a:a.replace(/원$/,'')+'~'+fmt(hi)}
