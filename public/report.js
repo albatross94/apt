@@ -52,8 +52,11 @@ function readLines(D){
     var big=k.newN>=k.renewN*2;
     l3='<b>'+(big?'신규 계약이 대부분입니다.':'신규와 갱신이 비슷합니다.')+'</b> 신규 '+k.newN+'건 · 갱신 '+k.renewN+'건'+(k.renewMed==null?'(표본 부족)':'')+'. 층별 중간값은 '+floorParts(D).join(' · ')+'.';
   }else{
-    var t=D.tiers||[];
-    l2=t.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+t[0].lab+' '+t[0].med+', '+t[t.length-1].lab+' '+t[t.length-1].med+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.';
+    // 보증금 구간 중 월세 중간값이 있는 구간(3건 이상)끼리 비교하고, 표본이 모자라거나 거래가 없는 구간은 끝에 따로 알린다
+    var tt=D.tiers||[],ok=tt.filter(function(x){return x.med!=='-'}),bad=tt.filter(function(x){return x.med==='-'});
+    var nm=function(x){return x.lab.indexOf('보증금')===0?x.lab:'보증금 '+x.lab};
+    var badTxt=bad.map(function(x){return ' '+nm(x)+' 구간은 '+(x.n==='0건'?'거래가 없습니다.':'표본 부족입니다.')}).join('');
+    l2=(ok.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+nm(ok[0])+' '+ok[0].med+', '+nm(ok[ok.length-1])+' '+ok[ok.length-1].med+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.')+badTxt;
     l3='<b>신규 '+k.newN+'건 · 갱신 '+k.renewN+'건입니다.</b> 층별 월세 중간값은 '+floorParts(D).join(' · ')+'.';
   }
   return [l1,l2,l3].filter(Boolean);
@@ -189,7 +192,7 @@ function page2(D,N,evi){
   var cap;
   if(T==='월세')cap='';
   else{var minT=D.ticks[D.ticks.length-1];
-    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.min!=null?' · 최저 '+fmt(k.min)+' · 중간값 '+fmt(k.med)+' · 최고 '+fmt(k.max):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
+    cap='<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">표본 '+k.n+'건 · '+esc(ymKo(D.period))+(k.lo&&k.hi?' · 최저 '+fmt(k.lo.v)+' · 중간값 '+fmt(k.med)+' · 최고 '+fmt(k.hi.v)+(T==='매매'?' <span style="font-size:11px">(최저·최고는 직거래 제외)</span>':''):'')+'. 세로축은 0원이 아니라 '+minT.toFixed(1)+'억 원에서 시작하니 눈금의 숫자를 함께 읽어 주세요.</span>'}
   var warn=T==='월세'?'<div style="background:#e6d9ce;padding:8px 12px;font-size:13px;line-height:20px;font-weight:700">'+esc(D.warn)+'</div>':'';
   var lower;
   if(T==='월세'){
