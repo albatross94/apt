@@ -33,6 +33,12 @@ function floorParts(D){
     var v=D.type==='월세'?(f.rent!=null?fmt(f.rent):null):(f.med!=null?fmt(f.med):null);
     return v?z[1]+' '+v+'('+f.n+'건'+(f.n<10?'·표본 적음':'')+')':z[1]+' '+f.n+'건'});
 }
+// 층별 월세 범위(월세 탭 1쪽): 2쪽 범례와 같은 값. 1건이면 값 하나, 0건이면 '거래 없음'
+function floorRentParts(D){
+  return FL.map(function(z){var f=D.floors[z[0]];
+    if(!(f.n>0))return z[1]+'은 거래 없음';
+    return z[1]+' '+rngTxt(f.rLo,f.rHi)+'('+f.n+'건'+(f.n<10?'·표본 적음':'')+')'});
+}
 // 최저~최고 표기: 8억 7,000만~11억 9,000만원 (앞 값의 끝 '원'을 떼어 붙인다)
 function rngTxt(lo,hi){var a=fmt(lo);return lo===hi?a:a.replace(/원$/,'')+'~'+fmt(hi)}
 // 층별 거래가격 구간(매매). 직거래·해제는 이미 자료에서 빠져 있다. 3건 미만이면 '표본 적음', 0건이면 '거래 없음'
@@ -68,7 +74,7 @@ function readLines(D){
     var nm=function(x){return x.lab.indexOf('보증금')===0?cl(x):'보증금 '+cl(x)};
     var badTxt=bad.map(function(x){return ' '+nm(x)+' 구간은 '+(x.n==='0건'?'거래가 없습니다.':'표본 부족입니다.')}).join('');
     l2=(ok.length>1?'<b>월세는 보증금에 따라 크게 달라집니다.</b> '+nm(ok[0])+' 월세 '+ok[0].rngS+', '+cl(ok[ok.length-1])+' '+ok[ok.length-1].rngS+'입니다.':'<b>월세는 보증금과 함께 봐야 합니다.</b> 보증금이 비슷한 거래끼리 비교해 주세요.')+badTxt;
-    l3='<b>신규 '+k.newN+'건 · 갱신 '+k.renewN+'건입니다.</b> 층별 월세 중간값은 '+floorParts(D).join(' · ')+'.';
+    l3='<b>신규 '+k.newN+'건 · 갱신 '+k.renewN+'건입니다.</b> 층별 월세 범위는 '+floorRentParts(D).join(' · ')+'.';
   }
   return [l1,l2,l3].filter(Boolean);
 }
