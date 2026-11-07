@@ -57,6 +57,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-ctrl label{display:flex;flex-direction:column;gap:.25rem;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .gx-ctrl select{font:inherit;color:var(--color-fg);background:var(--color-bg);border:1px solid var(--cds-border);border-radius:8px;padding:.4rem .6rem;min-width:9rem}
 .gx-ctrl select:disabled{opacity:.55}
+.gx-ctrl label{max-width:100%}.gx-ctrl select#apt{max-width:100%}   /* 긴 단지명 때문에 좁은 화면에서 가로 스크롤이 생기지 않게 */
 .gx-ctrl button{font:inherit;padding:.45rem 1.2rem;border-radius:8px;border:1px solid var(--color-fg);background:var(--color-fg);color:var(--color-bg);cursor:pointer;font-weight:var(--cds-font-weight-medium)}
 .gx-ctrl button:disabled{opacity:.5;cursor:wait}
 .gx-ctrl button.sec{background:transparent;color:var(--color-fg)}
@@ -207,6 +208,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
   .gx-page,.gx-col{gap:.7rem}
   .gx-card{break-inside:avoid;padding:.8rem 1rem;box-shadow:none}
   #gs-card{break-inside:auto}   /* 공시가격 표는 길어서 쪽을 넘겨 이어 나오게 한다 */
+  .gx-card.gx-mc{break-inside:auto}   /* 월별 중간값·증감률 카드: 표가 길면 쪽을 넘겨 이어 나오게 하고, 안의 요약(.gx-stats)·그래프(.gx-plot)는 위 규칙대로 쪼개지 않는다 */
   .gx-plot,.gx-stats,.gx-legend,.gx-areas,.gx-kv,.gx-warnbox,.gx-chips{break-inside:avoid}
   h1,h2,h3,.gx-rsub{break-after:avoid}
   .gx-table thead{display:table-header-group}   /* 표가 쪽을 넘어가면 머리글 반복 */
@@ -1103,7 +1105,8 @@ function monthlyChart(k, L, { rent, won1, sgnWon }) {
   const bars = L.filter((o) => o.pct != null && o.gap < GAP_FAR), far = L.filter((o) => o.pct != null && o.gap >= GAP_FAR);
   const mx = Math.max(1, d3.max(bars, (o) => Math.abs(o.pct)) || 0);
   const y2 = d3.scaleLinear().domain([-mx, mx]).nice().range([P2[1], P2[0]]);
-  const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').style('overflow', 'visible')
+  // 높이는 고정하지 않고 viewBox 비율로 정해, 인쇄처럼 폭이 달라져도 그래프 위아래에 빈 공간이 생기지 않게 한다
+  const svg = d3.select(el).append('svg').attr('width', '100%').style('height', 'auto').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').style('overflow', 'visible')
     .attr('aria-label', `월별 ${rent ? '월세 ' : ''}중간값 꺾은선과 증감률 막대 그래프`);
   const cap = (t, yy) => svg.append('text').attr('x', m.l).attr('y', yy).text(t).style('font-size', 'var(--cds-font-size-caption)').style('fill', 'var(--color-fg-muted)');
   cap(rent ? '월세 중간값' : `${KNAME[state.tab]} 중간값`, 13); cap('직전 대비 증감률', P2[0] - 8);
@@ -1144,6 +1147,7 @@ function monthlyCard(body, rows) {
   const rent = state.tab === 'wolse', KN = KNAME[state.tab];
   const vf = rent ? (v) => d3.median(v, (t) => t.rent) : med, won1 = rent ? (v) => `${fmtRent(v)}만원` : won;
   const k = card(`월별 ${KN} 중간값과 증감률`, `전용 ${state.pick}㎡ · 위 그래프와 같은 거래 · 한 달 ${LOW}건 이상인 달만 ${rent ? '월세 ' : ''}중간값을 내고, 증감률은 바로 앞의 중간값이 있는 달과 비교합니다(앞 달이 표본 부족이면 "N개월 전 대비"로 표시, 비교 간격이 ${GAP_FAR}개월 이상이면 증감률 대신 "간격 큼", 중간값을 낸 달이 3개월 미만이면 "기간 전체 변화"는 "표본 적음"). 상승은 붉은색 ▲, 하락은 파란색 ▼입니다.`);
+  k.classList.add('gx-mc');
   body.append(k);
   const L = monthlyChange(rows, monthsInRange(), vf), ok = L.filter((o) => o.med != null);
   if (ok.length < 2) { k.append(mk('div', `한 달 ${LOW}건 이상인 달이 ${ok.length}개뿐이라 증감률을 낼 수 없습니다. 조회 기간을 늘리거나 층 구간 선택을 풀어 보세요.`, 'gx-empty')); return; }
