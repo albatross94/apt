@@ -162,6 +162,25 @@ var SV={
  F:'<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="#202227"/></svg>',
  R:'<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4" fill="#fff" stroke="#202227" stroke-width="2"/></svg>'};
 
+/* 월별 중간값 아래 '전월 대비' 줄. 앱 monthlyChange와 같은 규칙: 3건 이상인 달(D.meds)끼리만 비교하고,
+   바로 앞 달이 비어 있으면 중간값이 있는 가장 가까운 앞 달과 비교하며 'N개월 전'을 작게 덧붙인다.
+   첫 표시 달의 비교 대상이 표 밖(12개월 이전)에 있어도 그 값을 쓴다. 계산은 억 단위 원값으로 하고 표시만 소수 첫째 자리. */
+function chgRow(D,c0,cols){
+  var byM={},prev=null,i;
+  D.meds.slice().sort(function(a,b){return a.mi-b.mi}).forEach(function(m){
+    if(prev){var pc=(m.p-prev.p)/prev.p*100;byM[m.mi]={pc:pc,gap:m.mi-prev.mi}}
+    prev=m});
+  var any=false,cells='';
+  for(i=c0;i<cols;i++){var c=byM[i];
+    if(!c){cells+='<span>—</span>';continue}
+    any=true;
+    var up=c.pc>0,dn=c.pc<0,txt=(up?'▲ ':dn?'▼ ':'')+Math.abs(c.pc).toFixed(1)+'%';
+    cells+='<span style="display:flex;flex-direction:column;align-items:center;white-space:nowrap;'+(up?'color:#c0392b':dn?'color:#1f5fa8':'')+'">'+txt+(c.gap>1?'<span style="font-size:11px;line-height:14px;font-weight:500">'+c.gap+'개월 전</span>':'')+'</span>'}
+  if(!any)return '<div style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><b>전월 대비</b> 3건 이상인 달이 둘 이상 없어 계산하지 않았습니다.</div>';
+  return '<div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #cbc8c1;padding-top:6px"><span style="font-size:13px;line-height:20px;font-weight:700">전월 대비 <span style="font-weight:500;color:#423f3d">· 3건 이상인 달끼리 비교, 앞 달이 비면 \'N개월 전\' 대비 · ▲ 상승 ▼ 하락</span></span>'+
+    '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));font-size:12px;line-height:18px;font-weight:700;text-align:center">'+cells+'</div></div>';
+}
+
 function page2(D,N,evi){
   var T=D.type,k=D.kpi;
   var leg=function(key,name,f){var med='';if(f.n&&T==='월세'&&f.dep!=null)med=' · 중간값 보증금 '+fmt(f.dep)+' · 월세 '+fmt(f.rent);else if(f.n&&f.med)med=' · 중간값 '+fmt(f.med);
@@ -185,7 +204,7 @@ function page2(D,N,evi){
     for(var i=c0;i<cols;i++){head+='<span style="padding:4px 0;font-weight:700">'+D.months[i]+'</span>';var m=byM[i];vals+='<span>'+(m?m.p.toFixed(2):'—')+'</span>'}
     lower='<div style="background:#fff;padding:12px 24px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+h2('월별 중간값')+'<span style="font-size:13px;line-height:20px;font-weight:500;color:#423f3d">단위 억 원 · 3건 미만인 달은 —' + (cols - c0 < cols ? ' · 최근 12개월만 표시' : '') + '</span></div>'+
     '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));border-top:2px solid #202227;border-bottom:1px solid #202227;font-size:13px;line-height:20px;text-align:center">'+head+'</div>'+
-    '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));font-size:14px;line-height:22px;font-weight:700;text-align:center;margin-top:-8px">'+vals+'</div></div>';
+    '<div style="display:grid;grid-template-columns:repeat('+(cols-c0)+',minmax(0,1fr));font-size:14px;line-height:22px;font-weight:700;text-align:center;margin-top:-8px">'+vals+'</div>'+chgRow(D,c0,cols)+'</div>';
   }else lower='<div style="background:#fff;padding:12px 24px;font-size:13px;line-height:20px;font-weight:500;color:#423f3d"><b>월별 중간값</b> 한 달에 3건 이상인 달이 없어 표시하지 않았습니다.</div>';
   return '<div class="pg">'+slim(D,2,N)+'<div style="'+BODY+'">'+
   '<div style="background:#fff;padding:16px 24px;display:flex;flex-direction:column;gap:8px">'+h2(T+' 그래프')+
