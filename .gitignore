@@ -4,6 +4,7 @@ cache/
 
 .vercel
 .env*
+!.env.example
 학교/
 *.xlsx
 

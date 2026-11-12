@@ -6,6 +6,6 @@
   "outputDirectory": "public",
   "regions": ["icn1"],
   "functions": {
-    "api/**/*.js": { "maxDuration": 60, "includeFiles": "{data/{school,kinder,daycare}/**,public/report-stats.js,public/report-charts.js,lib/fonts/**}" }
+    "api/**/*.js": { "maxDuration": 60, "includeFiles": "{data/{school,kinder,daycare,keywords}/**,public/report-stats.js,public/report-charts.js,lib/fonts/**}" }
   }
 }

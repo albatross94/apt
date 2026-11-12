@@ -2,7 +2,7 @@
    index.html 의 본문 스크립트 뒤에 불러온다($, loadKakao 같은 전역 함수를 쓴다).
    병원 자료: 건강보험심사평가원 병원정보서비스(/api/hospital), 지도: 카카오맵 */
 (() => {
-  const TABS = ['trade', 'hospital', 'school', 'kinder', 'daycare'];
+  const TABS = ['trade', 'hospital', 'school', 'kinder', 'daycare', 'keywords'];
   const hs = { map: null, markers: [], pop: null, rows: [], items: [], regionsReady: false };
 
   /* ----- 탭 전환 ----- */
@@ -19,6 +19,7 @@
     if (window.onSchoolTab) window.onSchoolTab(t === 'school');
     if (window.onKinderTab) window.onKinderTab(t === 'kinder');
     if (window.onDaycareTab) window.onDaycareTab(t === 'daycare');
+    if (window.onKeywordsTab) window.onKeywordsTab(t === 'keywords');
     if (t === 'hospital') {
       initRegions();
       // 숨겨져 있던 지도는 크기를 다시 계산해야 제대로 그려진다
