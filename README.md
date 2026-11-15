@@ -106,8 +106,9 @@ CLI로 하려면 `npm i -g vercel` 후 `vercel`(미리보기) / `vercel --prod`(
 ```
 
 - 호출하는 API는 `RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`(매매)와 `RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(전월세, `type=rent`)입니다. 전세·월세는 월세 유무로 나눕니다.
-- 한 달 치를 지역 코드(`LAWD_CD`)별로 페이지를 넘기며 모두 받아 `cache/지역코드_YYYYMM.json`에 저장합니다. 지난 달은 영구 캐시, 이번 달은 1시간만 캐시합니다.
+- 한 달 치를 지역 코드(`LAWD_CD`)별로 페이지를 넘기며 모두 받아 `cache/v2_지역코드_YYYYMM.json`(전월세는 `rent_지역코드_YYYYMM.json`)에 저장합니다. 매매 캐시 이름의 `v2`는 `lib/core.js`의 `TRADE_CACHE_VER`입니다. 매매 항목이 바뀔 때 이 값을 올리면 옛 캐시를 건너뛰고 새로 받습니다(옛 파일은 지우지 않습니다). 지난 달은 영구 캐시, 이번 달은 1시간만 캐시합니다.
 - 해제(취소)된 거래는 분석에서 제외합니다.
+- 매매 자료에는 기본 API가 주는 **아파트 동 `bldg`**(예: `102`)와 **등기일자 `rgst`**(`YYYY-MM-DD`)가 들어 있고, 실거래 목록 표의 '동' 칸에 보입니다(기존 `dong`은 법정동이라 표 제목을 '법정동'으로 바꿈). **동 정보는 소유권 이전등기를 마친 거래만 공개**되어, 최근 1~3개월 거래는 비어 있는 게 정상입니다. 전월세 API에는 동 항목이 없습니다. 상세 API(`RTMSDataSvcAptTradeDev`)는 쓰지 않습니다(활용신청 안 됨, 기본 API에도 동이 있음).
 - 단지 정보는 `AptListService4/getSigunguAptList4`(시군구별 단지 목록)에서 실거래 자료의 단지명·법정동과 가장 비슷한 단지코드를 찾고(`SKVIEW`와 `SK뷰` 같은 표기 차이는 맞춤), `AptBasisInfoServiceV5/getAphusBassInfoV5·getAphusDtlInfoV5`로 기본·상세정보를 받습니다(`/api/aptdetail`, 30일 캐시). 토지이용계획은 V-World `getLandUseAttr`(`/api/landuse`), 공시가격 동·호로 센 세대수는 `/api/aptinfo`입니다.
 - 공시가격은 선택한 단지의 시도·시군구·법정동·지번으로 V-World 주소 검색에서 필지번호(PNU)를 얻고, 그 PNU로 `getApartHousingPriceAttr`를 호출해 가져옵니다. 연도별 결과는 `cache/`에 저장되며, 올해 자료는 7일, 지난 연도는 영구 캐시합니다.
 - 화면은 D3.js로 그립니다. 라이브러리를 CDN에서 불러오므로 인터넷 연결이 필요합니다.

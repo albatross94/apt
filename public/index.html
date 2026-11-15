@@ -93,6 +93,7 @@ html,body{margin:0}body{background:var(--color-bg);color:var(--color-fg);font-fa
 .gx-kv dt{color:var(--color-fg-muted)}.gx-kv dd{margin:0;word-break:keep-all}
 .gx-warn{color:var(--color-bad)}
 .gx-table td.l,.gx-table th.l{text-align:left}
+.gx-dash{color:var(--color-fg-muted)}
 .gx-extreme{color:var(--color-bad);font-weight:var(--cds-font-weight-semibold,600)}
 .gx-up{color:#c0392b;font-weight:600}.gx-down{color:#1f5fa8;font-weight:600}
 .gx-sech{font-size:var(--cds-font-size-title);font-weight:400;margin:var(--cds-gap-lg) 0 0}
@@ -1192,7 +1193,7 @@ function monthlyCard(body, rows) {
 
 function tradeList(body, rows) {
   const sale = state.tab === 'sale', wolse = state.tab === 'wolse';
-  const k = card('그래프에 쓴 거래 목록', `전용 ${state.pick}㎡ · ${rows.length.toLocaleString()}건 · 최근 거래순 · 최고가·최저가는 붉은색으로 표시` + (rows.length > 500 ? ' (최근 500건만 표시)' : ''));
+  const k = card('그래프에 쓴 거래 목록', `전용 ${state.pick}㎡ · ${rows.length.toLocaleString()}건 · 최근 거래순 · 최고가·최저가는 붉은색으로 표시` + (rows.length > 500 ? ' (최근 500건만 표시)' : '') + (sale ? ' · 동 정보는 소유권 이전등기를 마친 거래만 공개됩니다.' : ''));
   const list = [...rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 500);
   // 조회기간(rows) 전체 기준으로 최고가·최저가를 찾는다 (직거래·해제는 이미 자료에서 빠져 있다)
   const maxP = rows.length ? d3.max(rows, (r) => r.price) : null;
@@ -1201,8 +1202,9 @@ function tradeList(body, rows) {
     if (maxP === minP || (r.price !== maxP && r.price !== minP)) return fmt(r.price);
     return mk('span', fmt(r.price), 'gx-extreme');
   };
-  const tbl = mkTable(['계약일', '동', '층', sale ? '거래가(만원)' : '보증금(만원)', ...(wolse ? ['월세(만원)'] : []), sale ? '거래 방식' : '계약구분', '상태'],
-    list.map((r) => [r.date, r.dong, String(r.floor), priceCell(r), ...(wolse ? [fmt(r.rent)] : []), r.gbn || '—', '정상']), [0, 1]);
+  const bldgCell = (r) => r.bldg ? `${r.bldg}동` : mk('span', '-', 'gx-dash');   // 아파트 동(매매만, 등기 전 거래는 비어 있음)
+  const tbl = mkTable(['계약일', '법정동', ...(sale ? ['동'] : []), '층', sale ? '거래가(만원)' : '보증금(만원)', ...(wolse ? ['월세(만원)'] : []), sale ? '거래 방식' : '계약구분', '상태'],
+    list.map((r) => [r.date, r.dong, ...(sale ? [bldgCell(r)] : []), String(r.floor), priceCell(r), ...(wolse ? [fmt(r.rent)] : []), r.gbn || '—', '정상']), [0, 1]);
   k.classList.add('no-print');   // PDF에는 넣지 않는다
   k.append(tbl); body.append(k);
 }
